@@ -1,0 +1,72 @@
+{
+  "name": "eis-as-notas",
+  "version": "1.0.0",
+  "description": "Eis as Notas - avaliação da temporada de Fórmula 1",
+  "author": "Eis as Notas",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "test": "node test/storage.test.js"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "br.com.eisasnotas.app",
+    "productName": "Eis as Notas",
+    "copyright": "Eis as Notas",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "storage.js",
+      "index.html",
+      "package.json",
+      "build/icon.png"
+    ],
+    "artifactName": "EisAsNotas-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.sports",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Eis as Notas"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Eis as Notas",
+      "language": "1046",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

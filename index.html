@@ -304,7 +304,7 @@ function mk27(){ return RACES27.map(([name,circuit,date,track],i)=>({id:"g"+(i+1
 function activate(o,y){ y=String(y); if(!o.seasons[y]) y="2026"; o.season=+y; o.races=o.seasons[y].races; o.ratings=o.seasons[y].ratings; return o; }
 function defaults(){
   return activate({
-    version:4, season:2026, evaluators:["Avaliador 1","Avaliador 2","Avaliador 3"],
+    version:4, season:2026, evaluators:["Avaliador 1","Avaliador 2","Avaliador 3","Avaliador 4"],
     teams:TEAMS0.map(([id,name,color])=>({id,name,color,logo:null,car:null})),
     drivers:DRIVERS0.map(([name,team],i)=>({id:"d"+(i+1),name,team,photo:null})),
     seasons:{"2026":{races:RACES0.map(([name,circuit,date],i)=>({id:"r"+(i+1),name,circuit,date})),ratings:{}},
@@ -336,6 +336,8 @@ function migrate(o){
   o=migrateV3(o);
   if(!o.seasons){ o.seasons={"2026":{races:o.races,ratings:o.ratings},"2027":{races:mk27(),ratings:{}}}; }
   if(!o.seasons["2027"]) o.seasons["2027"]={races:mk27(),ratings:{}};
+  if(!Array.isArray(o.evaluators)) o.evaluators=[];
+  while(o.evaluators.length<4) o.evaluators.push("Avaliador "+(o.evaluators.length+1));
   o.version=4;
   return activate(o,o.season===2027?2027:2026);
 }
@@ -369,7 +371,8 @@ function parseNota(v){
 }
 function tone(v){ if(v==null) return ""; v=Math.round(v*100)/100; return v>=8?"t-g":v>=5?"t-y":"t-r"; }
 function tv(v,t){ return v!=null? `<span class="${tone(v)}">${fmt(v)}</span>` : (t||fmt(v)); }
-function avg3(a){ return (a&&a.length===3&&a.every(x=>x!=null)) ? (a[0]+a[1]+a[2])/3 : null; }
+function avg3(a){ // média das notas preenchidas; vale quando há pelo menos 3 (o 4º avaliador é opcional)
+  const f=(a||[]).filter(x=>x!=null); return f.length>=3 ? f.reduce((x,y)=>x+y,0)/f.length : null; }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const teamOf = id => S.teams.find(t=>t.id===id);
 const driverOf = id => S.drivers.find(d=>d.id===id);
@@ -377,10 +380,81 @@ const raceOf = id => S.races.find(r=>r.id===id);
 const initials = n => n.split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
 function fdate(d){ if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; }
 
+
+/* ---------- Resultado oficial pela internet (API pública Jolpica/Ergast) ---------- */
+const RES_API="https://api.jolpi.ca/ergast/f1/";
+const resCal={}, resTried=new Set();
+const todayISO=()=>new Date().toLocaleDateString("sv");
+const noAcc=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+async function jget(path){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),15000);
+  try{ const res=await fetch(RES_API+path,{signal:ctl.signal}); if(!res.ok) throw new Error("HTTP "+res.status); return await res.json(); }
+  finally{ clearTimeout(t); }
+}
+async function fetchResult(raceId,silent){
+  const race=raceOf(raceId); if(!race||!race.date) return false;
+  const say=m=>{ if(!silent) toast(m); };
+  try{
+    const year=race.date.slice(0,4);
+    if(!resCal[year]) resCal[year]=((await jget(year+".json?limit=100")).MRData.RaceTable.Races)||[];
+    const t0=Date.parse(race.date+"T12:00:00Z");
+    const hit=resCal[year].find(x=>Math.abs(Date.parse(x.date+"T12:00:00Z")-t0)<=86400000);
+    if(!hit){ say("Corrida não encontrada no calendário oficial."); return false; }
+    const j=await jget(year+"/"+hit.round+"/results.json?limit=100");
+    const list=(((j.MRData.RaceTable.Races||[])[0]||{}).Results)||[];
+    if(list.length<10){ say("Resultado oficial ainda não disponível."); return false; }
+    const ids=[], miss=[];
+    list.slice().sort((a,b)=>(+a.position)-(+b.position)).forEach(x=>{
+      const nm=noAcc(x.Driver&&x.Driver.familyName); const id=SN[nm];
+      if(id&&!ids.includes(id)) ids.push(id); else if(!id) miss.push(nm);
+    });
+    if(ids.length<10){ say("Não consegui reconhecer os pilotos do resultado."); return false; }
+    const r=rr(raceId); r.fetched=ids; r.manual=false; save();
+    if(view==="notas"&&selRace===raceId) render();
+    say("Resultado oficial carregado"+(miss.length?" (sem cadastro: "+miss.join(", ")+")":"")+".");
+    fetchTeamStandings(true);
+    return true;
+  }catch(e){
+    say(navigator.onLine===false?"Sem internet: não foi possível buscar o resultado.":"Não foi possível buscar o resultado agora. Tente de novo mais tarde.");
+    return false;
+  }
+}
+
+/* ---------- Classificação oficial de construtores ---------- */
+const TEAM_ALIAS={redbull:"redbull",astonmartin:"aston",rb:"rb",racingbulls:"rb",visacashapprb:"rb",sauber:"audi",kicksauber:"audi",audi:"audi",haas:"haas",haasf1team:"haas",alpine:"alpine",alpinef1team:"alpine",williams:"williams",mclaren:"mclaren",mercedes:"mercedes",ferrari:"ferrari",cadillac:"cadillac",cadillacf1team:"cadillac"};
+const slug=s=>noAcc(s).toLowerCase().replace(/[^a-z]/g,"");
+function teamFromC(c){
+  const a=TEAM_ALIAS[slug(c.constructorId)]||TEAM_ALIAS[slug(c.name)]; if(a&&teamOf(a)) return a;
+  const nm=slug(c.name); const t=S.teams.find(t=>{const k=slug(t.name); return k&&nm&&(k===nm||nm.includes(k)||k.includes(nm));});
+  return t?t.id:null;
+}
+const teamTried=new Set();
+async function fetchTeamStandings(silent){
+  const say=m=>{ if(!silent) toast(m); };
+  try{
+    const year=S.season;
+    const j=await jget(year+"/constructorstandings.json");
+    const lists=(j.MRData.StandingsTable||{}).StandingsLists||[];
+    const list=(lists[0]||{}).ConstructorStandings||[];
+    if(list.length<5){ say("Classificação de equipes ainda não disponível para "+year+"."); return false; }
+    const ids=[], pos={}, pts={};
+    list.forEach(x=>{ const id=teamFromC(x.Constructor||{}); if(id&&!ids.includes(id)){ ids.push(id); pos[id]=+x.position; pts[id]=+x.points; } });
+    if(ids.length<5){ say("Não consegui reconhecer as equipes da classificação."); return false; }
+    S.teams.sort((a,b)=>{ const ia=ids.indexOf(a.id), ib=ids.indexOf(b.id); return (ia<0?999:ia)-(ib<0?999:ib); }); // sort é estável: equipes sem dados ficam no fim, na ordem atual
+    S.teamStand={year,updated:todayISO(),pos,pts}; save();
+    if(view==="notas"||view==="equipes") render();
+    say("Classificação oficial das equipes atualizada.");
+    return true;
+  }catch(e){
+    say(navigator.onLine===false?"Sem internet: não foi possível buscar a classificação.":"Não foi possível buscar a classificação agora.");
+    return false;
+  }
+}
+
 function rr(raceId){ // garante registro da corrida
-  if(!S.ratings[raceId]) S.ratings[raceId]={drivers:{},teams:{},race:[null,null,null],order:S.drivers.map(d=>d.id)};
+  if(!S.ratings[raceId]) S.ratings[raceId]={drivers:{},teams:{},race:[null,null,null,null],order:S.drivers.map(d=>d.id)};
   const r=S.ratings[raceId];
-  if(!r.manual && RESULTS[raceId]) r.order=RESULTS[raceId].slice();   // ordem oficial, a menos que o usuário tenha reordenado
+  const off=r.fetched||RESULTS[raceId]; if(!r.manual && off) r.order=off.slice();   // ordem oficial, a menos que o usuário tenha reordenado
   // sincroniza ordem com pilotos existentes
   r.order=r.order.filter(id=>driverOf(id));
   S.drivers.forEach(d=>{ if(!r.order.includes(d.id)) r.order.push(d.id); });
@@ -464,6 +538,7 @@ function render(){
   renderNav(); renderSeason();
   $("#ano").textContent=S.season;
   ({visao:vVisao,pilotos:vPilotos,notas:vNotas,equipes:vEquipes,corridas:vCorridas,historico:vHistorico})[view]();
+  if((view==="notas"||view==="equipes")&&!teamTried.has(S.season)){ teamTried.add(S.season); fetchTeamStandings(true); }
 }
 const M = ()=>$("#main");
 
@@ -492,9 +567,13 @@ function vVisao(){
     </div>
     <h2>Como funciona</h2>
     <div class="card muted">
-      Notas de 0 a 10 (aceita decimais, ex.: 8,5). Três avaliadores dão nota a cada piloto, equipe e Grande Prêmio; uma quarta pessoa digita.
-      A média é calculada sozinha quando as três notas estão preenchidas. Só a corrida principal conta — Sprints ficam de fora.
-      Os dados ficam salvos neste computador (neste navegador). Use <b>Salvar backup</b> no menu lateral com frequência.
+      Notas de 0 a 10 (aceita decimais, ex.: 8,5). Até quatro avaliadores dão nota a cada piloto, equipe e Grande Prêmio.
+      A média é calculada automaticamente quando pelo menos três notas estão preenchidas (a do 4º avaliador é opcional). Só a corrida principal conta — Sprints ficam de fora.
+      Depois de cada corrida, a ordem de chegada é preenchida sozinha com o resultado oficial (pelo botão <b>Buscar resultado</b> na aba Notas; precisa de internet).
+      ${(typeof DESK!=="undefined"&&DESK)
+        ? "Os dados ficam salvos neste computador e, se você escolher uma pasta na nuvem (iCloud Drive, OneDrive, Google Drive ou Dropbox), também são copiados para lá automaticamente."
+        : "Os dados ficam salvos neste computador (neste navegador). No app para Mac e Windows também é possível salvar cópias automáticas numa pasta na nuvem (iCloud Drive, OneDrive, Google Drive ou Dropbox)."}
+      Use <b>Salvar backup</b> no menu lateral com frequência.
     </div>
     <h2>Temporada</h2>
     <div class="card row" style="gap:14px;flex-wrap:wrap">
@@ -532,7 +611,7 @@ function vNotas(){
   const evHead=ev.map((n,i)=>`<th class="evc"><input type="text" class="evn" data-i="${i}" value="${esc(n)}" style="width:92px;text-align:center;padding:4px"></th>`).join("");
   M().innerHTML=`
     <h1>Notas</h1>
-    <p class="sub">Digite as três notas (0 a 10). A média aparece sozinha e tudo é salvo na hora.</p>
+    <p class="sub">Digite as notas (0 a 10). A média aparece sozinha quando há pelo menos três notas, e tudo é salvo na hora.</p>
     <div class="hero">
       <div class="toolbar" style="margin:0;flex-direction:column;align-items:flex-start">
         <select id="raceSel">${S.races.map(x=>`<option value="${x.id}" ${x.id===selRace?"selected":""}>${hasRating(x.id)?"✔ ":""}${esc(x.name)} (${fdate(x.date)})</option>`).join("")}</select>
@@ -542,9 +621,9 @@ function vNotas(){
       ${trackPanel(selRace)}
     </div>
 
-    <h2>Pilotos <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem de chegada (arraste ☰ ou use ▲▼)</span>${RESULTS[selRace]?` <button class="btn sm" id="resetOrd" style="margin-left:10px;text-transform:none;letter-spacing:0">↺ Ordem oficial</button>`:""}</h2>
+    <h2>Pilotos <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem de chegada (arraste ☰ ou use ▲▼)</span>${(r.fetched||RESULTS[selRace])?` <button class="btn sm" id="resetOrd" style="margin-left:10px;text-transform:none;letter-spacing:0">↺ Ordem oficial</button>`:""}${raceOf(selRace).date<=todayISO()?` <button class="btn sm" id="fetchRes" style="margin-left:6px;text-transform:none;letter-spacing:0" title="Busca a classificação final na internet">⟳ Buscar resultado</button>`:""}</h2>
     <div class="tablewrap"><table id="tblD" class="gt">${NCOLS}<thead><tr><th></th><th>Pos</th><th>Piloto</th>${evHead}<th class="num">Média</th><th></th></tr></thead><tbody>
-      ${r.order.map((id,i)=>{ const d=driverOf(id),t=teamOf(d.team); const a=r.drivers[id]||[null,null,null];
+      ${r.order.map((id,i)=>{ const d=driverOf(id),t=teamOf(d.team); const a=r.drivers[id]||[null,null,null,null];
         return `<tr draggable="true" data-idx="${i}" data-did="${id}">
           <td class="handle">☰</td><td class="pos">${i+1}</td>
           <td><div class="row">${avatar(d)}<div><b>${esc(d.name)}</b>${RESULTS[selRace]&&!RESULTS[selRace].includes(id)?' <span class="tag" style="background:#ffffff14;color:#aaa">não correu</span>':""}<div class="muted" style="font-size:12px"><span class="team-dot" style="background:${t?t.color:"#444"}"></span>${esc(t?t.name:"")}</div></div></div></td>
@@ -553,9 +632,9 @@ function vNotas(){
           <td><button class="btn sm" data-mv="-1">▲</button> <button class="btn sm" data-mv="1">▼</button></td></tr>`;}).join("")}
     </tbody></table></div>
 
-    <h2>Equipes</h2>
+    <h2>Equipes${(S.teamStand&&S.teamStand.year===S.season)?` <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem da classificação oficial do campeonato</span>`:""}</h2>
     <div class="tablewrap"><table class="gt">${NCOLS}<thead><tr><th colspan="3">Equipe</th>${evHead}<th class="num">Média</th><th></th></tr></thead><tbody>
-      ${S.teams.map(t=>{ const a=r.teams[t.id]||[null,null,null];
+      ${S.teams.map(t=>{ const a=r.teams[t.id]||[null,null,null,null];
         return `<tr><td colspan="3"><span class="team-dot" style="background:${t.color}"></span><b>${esc(t.name)}</b></td>
           ${notaCells("teams",t.id,a)}
           <td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}" data-avg="teams:${t.id}">${fmt(avg3(a))}</span></td><td></td></tr>`;}).join("")}
@@ -566,6 +645,8 @@ function vNotas(){
       <tbody><tr><td colspan="3"><b>${esc(raceOf(selRace).name)}</b></td>${notaCells("race",null,r.race)}<td class="num"><span class="avg ${avg3(r.race)!=null?"has":""} ${tone(avg3(r.race))}" data-avg="race">${fmt(avg3(r.race))}</span></td><td></td></tr></tbody></table></div>`;
 
   $("#raceSel").onchange=e=>{ selRace=e.target.value; render(); };
+  const fr=$("#fetchRes"); if(fr) fr.onclick=async()=>{ fr.disabled=true; fr.textContent="Buscando…"; await fetchResult(selRace,false); if(document.body.contains(fr)){ fr.disabled=false; fr.textContent="⟳ Buscar resultado"; } };
+  if(!r.fetched && !RESULTS[selRace] && !r.manual && raceOf(selRace).date<=todayISO() && !resTried.has(selRace)){ resTried.add(selRace); fetchResult(selRace,true); }
   const ro=$("#resetOrd"); if(ro) ro.onclick=()=>{ r.manual=false; save(); render(); toast("Ordem oficial restaurada"); };
   $$(".evn").forEach(inp=>inp.onchange=()=>{ S.evaluators[+inp.dataset.i]=inp.value.trim()||("Avaliador "+(+inp.dataset.i+1)); save(); render(); });
   $$(".nota").forEach(inp=>{
@@ -575,7 +656,7 @@ function vNotas(){
       const kind=inp.dataset.k,id=inp.dataset.id,i=+inp.dataset.i;
       let arr;
       if(kind==="race") arr=r.race;
-      else { if(!r[kind][id]) r[kind][id]=[null,null,null]; arr=r[kind][id]; }
+      else { if(!r[kind][id]) r[kind][id]=[null,null,null,null]; arr=r[kind][id]; }
       arr[i]=val; save();
       const key=kind==="race"?"race":kind+":"+id;
       const out=$(`[data-avg="${key}"]`); const m=avg3(arr);
@@ -601,9 +682,9 @@ function vNotas(){
       const [m]=r.order.splice(from,1); r.order.splice(to,0,m); r.manual=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); };
   });
 }
-const NCOLS='<colgroup><col style="width:34px"><col style="width:52px"><col><col style="width:116px"><col style="width:116px"><col style="width:116px"><col style="width:84px"><col style="width:96px"></colgroup>';
+const NCOLS='<colgroup><col style="width:34px"><col style="width:52px"><col><col style="width:104px"><col style="width:104px"><col style="width:104px"><col style="width:104px"><col style="width:84px"><col style="width:96px"></colgroup>';
 function notaCells(kind,id,arr){
-  return [0,1,2].map(i=>`<td style="text-align:center"><input type="text" inputmode="decimal" class="nota" data-k="${kind}" data-id="${id??""}" data-i="${i}" value="${fmtIn(arr?arr[i]:null)}" placeholder="0–10"></td>`).join("");
+  return [0,1,2,3].map(i=>`<td style="text-align:center"><input type="text" inputmode="decimal" class="nota" data-k="${kind}" data-id="${id??""}" data-i="${i}" value="${fmtIn(arr?arr[i]:null)}" placeholder="0–10"></td>`).join("");
 }
 
 /* ============ 4. Equipes ============ */
@@ -612,17 +693,18 @@ function vEquipes(){
   M().innerHTML=`
     <h1>Equipes</h1>
     <p class="sub">As médias e o ranking das equipes ficam no Histórico. Clique em uma equipe para editar nome, cor, logotipo e imagem do carro.</p>
-    <div class="toolbar"><button class="btn red" id="addT">+ Equipe</button></div>
+    <div class="toolbar"><button class="btn red" id="addT">+ Equipe</button> <button class="btn" id="fetchTeams" title="Busca a classificação de construtores na internet">⟳ Classificação oficial</button>${(S.teamStand&&S.teamStand.year===S.season)?`<span class="muted" style="margin-left:8px">Ordem da classificação oficial do campeonato · atualizada em ${fdate(S.teamStand.updated)}</span>`:""}</div>
     <div class="grid g3">${list.map((r,i)=>{
       const t=r.x; const ds=S.drivers.filter(d=>d.team===t.id);
       return `<div class="card shortcut" data-id="${t.id}" style="--c:${t.color}">
         <div class="bar"></div>
-        <div class="row" style="justify-content:space-between"><b style="font-size:17px">${esc(t.name)}</b>${t.logo?`<img class="logo-sm" src="${t.logo}" alt="">`:""}</div>
+        <div class="row" style="justify-content:space-between"><b style="font-size:17px">${(S.teamStand&&S.teamStand.year===S.season&&S.teamStand.pos[t.id])?S.teamStand.pos[t.id]+"º · ":""}${esc(t.name)}</b>${t.logo?`<img class="logo-sm" src="${t.logo}" alt="">`:""}</div>
         ${t.car?`<img class="car" src="${t.car}" alt="">`:`<div class="car ph">sem imagem do carro</div>`}
-        <div class="muted" style="font-size:13px">${ds.map(d=>esc(d.name)).join(" · ")}</div>
+        <div class="muted" style="font-size:13px">${ds.map(d=>esc(d.name)).join(" · ")}</div>${(S.teamStand&&S.teamStand.year===S.season&&S.teamStand.pts[t.id]!=null)?`<div class="muted" style="font-size:12px;margin-top:4px">${S.teamStand.pts[t.id]} pts no campeonato</div>`:""}
       </div>`;}).join("")}</div>`;
   $$("[data-id]").forEach(e=>e.onclick=()=>editTeam(e.dataset.id));
   $("#addT").onclick=()=>editTeam(null);
+  $("#fetchTeams").onclick=async e=>{ const b=e.currentTarget; b.disabled=true; b.textContent="Buscando…"; await fetchTeamStandings(false); if(document.body.contains(b)){ b.disabled=false; b.textContent="⟳ Classificação oficial"; } };
 }
 
 /* ============ 5. Corridas ============ */
@@ -667,10 +749,10 @@ function vHistorico(){
       ${histRace?`<span class="tag">Média da corrida: ${tv(raceAvg(histRace))}</span>`:""}</div>
     ${r?`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
       <div class="tablewrap"><table><thead><tr><th>Pos</th><th>Piloto</th>${S.evaluators.map(n=>`<th class="num">${esc(n)}</th>`).join("")}<th class="num">Média</th></tr></thead><tbody>
-        ${r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return `<tr><td class="pos">${i+1}</td><td>${esc(d.name)}</td>${[0,1,2].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}
+        ${r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return `<tr><td class="pos">${i+1}</td><td>${esc(d.name)}</td>${[0,1,2,3].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}
       </tbody></table></div>
       <div class="tablewrap" style="align-self:start"><table><thead><tr><th>Equipe</th>${S.evaluators.map(n=>`<th class="num">${esc(n)}</th>`).join("")}<th class="num">Média</th></tr></thead><tbody>
-        ${S.teams.map(t=>{ const a=r.teams[t.id]||[]; return `<tr><td><span class="team-dot" style="background:${t.color}"></span>${esc(t.name)}</td>${[0,1,2].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}
+        ${S.teams.map(t=>{ const a=r.teams[t.id]||[]; return `<tr><td><span class="team-dot" style="background:${t.color}"></span>${esc(t.name)}</td>${[0,1,2,3].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}
       </tbody></table></div></div>`:""}
 
     <h2>Evolução</h2>
@@ -709,7 +791,7 @@ function racesChart(){
       <div class="rc-t" title="${esc(r.name)}: ${v!=null?fmt(v):"sem notas"}"><div class="rc-b ${tone(v)}" style="width:${v!=null?v*10:0}%"></div></div>
       <span class="rc-v ${tone(v)}">${v!=null?fmt(v):"—"}</span></div>`;}).join("");
   return `<div class="rchart">
-    <div class="rc-head"><span>Média das três avaliações por Grande Prêmio, na ordem do calendário</span>
+    <div class="rc-head"><span>Média das avaliações por Grande Prêmio, na ordem do calendário</span>
       <span>${bi>=0?`Melhor corrida: <b>${esc(short(S.races[bi].name))}</b> (${tv(best)})`:"Nenhuma corrida avaliada ainda"}</span></div>
     <div class="rc-grid">${rows}
       <span></span><span></span><div class="rc-axis"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span></div><span></span>

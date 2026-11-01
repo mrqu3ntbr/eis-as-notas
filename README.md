@@ -79,6 +79,10 @@ O app não fala com nenhum serviço de nuvem por conta própria (continua 100% o
 
 **Atenção**: não coloque a pasta de dados do app (a de “Abrir pasta dos dados”) dentro da nuvem; sincronizar o arquivo em uso por dois computadores pode gerar conflitos. Use apenas a pasta de backup.
 
+## Resultados pela internet
+
+O botão **⟳ Buscar resultado** (aba Notas) e a busca automática usam duas fontes públicas, nesta ordem: **OpenF1** (api.openf1.org, mais rápida) e, se ela falhar ou ainda não tiver a corrida, **Jolpica/Ergast** (api.jolpi.ca). A classificação de construtores vem da Jolpica. Sem internet, o app continua funcionando normalmente com a ordem que já estiver salva ou digitada.
+
 ## 4. Trazer os dados que você já tem (do arquivo HTML)
 
 1. No `eis-as-notas.html` que você usa hoje, clique em **Salvar backup**.

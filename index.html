@@ -396,33 +396,72 @@ async function jget(path){
   try{ const res=await fetch(RES_API+path,{signal:ctl.signal}); if(!res.ok) throw new Error("HTTP "+res.status); return await res.json(); }
   finally{ clearTimeout(t); }
 }
+async function ufetch(url){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),12000);
+  try{ const res=await fetch(url,{signal:ctl.signal}); if(!res.ok) throw new Error("HTTP "+res.status); return await res.json(); }
+  finally{ clearTimeout(t); }
+}
+const SNL=Object.fromEntries(Object.entries(SN).map(([k,v])=>[k.toLowerCase(),v]));
+const surId=n=>SNL[noAcc(n).toLowerCase().trim()];
+const OF1="https://api.openf1.org/v1/", of1Cache={};
+/* Fonte 1: OpenF1 (rápida). Devolve {ids,stt,miss,src} ou null se ainda não há resultado. */
+async function getFromOpenF1(race){
+  const year=race.date.slice(0,4);
+  if(!of1Cache[year]) of1Cache[year]=await ufetch(OF1+"sessions?year="+year+"&session_name=Race");
+  const t0=Date.parse(race.date+"T12:00:00Z");
+  const ses=(of1Cache[year]||[]).find(x=>x.date_start&&Math.abs(Date.parse(x.date_start.slice(0,10)+"T12:00:00Z")-t0)<=86400000);
+  if(!ses) return null;
+  const [res,drv]=await Promise.all([ufetch(OF1+"session_result?session_key="+ses.session_key), ufetch(OF1+"drivers?session_key="+ses.session_key)]);
+  if(!Array.isArray(res)||res.length<15) return null;
+  const byNum={}; (drv||[]).forEach(d=>{ byNum[d.driver_number]=d; });
+  const ord=res.slice().sort((a,b)=>{
+    const pa=typeof a.position==="number"?a.position:999, pb=typeof b.position==="number"?b.position:999;
+    return pa!==pb? pa-pb : (b.number_of_laps||0)-(a.number_of_laps||0);
+  });
+  const ids=[], stt={}, miss=[];
+  ord.forEach(x=>{
+    const d=byNum[x.driver_number]||{}; const nm=d.last_name||String((d.full_name||"").split(" ").slice(-1)[0]||"");
+    const id=surId(nm)||surId(String(d.full_name||"").split(" ").slice(1).join(" "));
+    if(!id){ if(nm) miss.push(nm); return; }
+    if(ids.includes(id)) return;
+    ids.push(id);
+    const v=x.dsq?"DSQ":x.dns?"DNS":x.dnf?"DNF":""; if(v) stt[id]=v;
+  });
+  return {ids,stt,miss,src:"OpenF1"};
+}
+/* Fonte 2: Jolpica/Ergast (mais lenta, usada se a OpenF1 falhar ou ainda não tiver o resultado). */
+async function getFromJolpica(race){
+  const year=race.date.slice(0,4);
+  if(!resCal[year]) resCal[year]=((await jget(year+".json?limit=100")).MRData.RaceTable.Races)||[];
+  const t0=Date.parse(race.date+"T12:00:00Z");
+  const hit=resCal[year].find(x=>Math.abs(Date.parse(x.date+"T12:00:00Z")-t0)<=86400000);
+  if(!hit) return null;
+  const j=await jget(year+"/"+hit.round+"/results.json?limit=100");
+  const list=(((j.MRData.RaceTable.Races||[])[0]||{}).Results)||[];
+  if(list.length<10) return null;
+  const ids=[], miss=[], stt={};
+  list.slice().sort((a,b)=>(+a.position)-(+b.position)).forEach(x=>{
+    const nm=noAcc(x.Driver&&x.Driver.familyName); const id=surId(nm);
+    if(id&&!ids.includes(id)){ ids.push(id); const v=stFromApi(x); if(v) stt[id]=v; } else if(!id) miss.push(nm);
+  });
+  return {ids,stt,miss,src:"Jolpica"};
+}
 async function fetchResult(raceId,silent){
   const race=raceOf(raceId); if(!race||!race.date) return false;
   const say=m=>{ if(!silent) toast(m); };
-  try{
-    const year=race.date.slice(0,4);
-    if(!resCal[year]) resCal[year]=((await jget(year+".json?limit=100")).MRData.RaceTable.Races)||[];
-    const t0=Date.parse(race.date+"T12:00:00Z");
-    const hit=resCal[year].find(x=>Math.abs(Date.parse(x.date+"T12:00:00Z")-t0)<=86400000);
-    if(!hit){ say("Corrida não encontrada no calendário oficial."); return false; }
-    const j=await jget(year+"/"+hit.round+"/results.json?limit=100");
-    const list=(((j.MRData.RaceTable.Races||[])[0]||{}).Results)||[];
-    if(list.length<10){ say("Resultado oficial ainda não disponível."); return false; }
-    const ids=[], miss=[], stt={};
-    list.slice().sort((a,b)=>(+a.position)-(+b.position)).forEach(x=>{
-      const nm=noAcc(x.Driver&&x.Driver.familyName); const id=SN[nm];
-      if(id&&!ids.includes(id)){ ids.push(id); const v=stFromApi(x); if(v) stt[id]=v; } else if(!id) miss.push(nm);
-    });
-    if(ids.length<10){ say("Não consegui reconhecer os pilotos do resultado."); return false; }
-    const r=rr(raceId); r.fetched=ids; r.apiStatus=stt; r.manual=false; save();
-    if(view==="notas"&&selRace===raceId) render();
-    say("Resultado oficial carregado"+(miss.length?" (sem cadastro: "+miss.join(", ")+")":"")+".");
-    fetchTeamStandings(true);
-    return true;
-  }catch(e){
-    say(navigator.onLine===false?"Sem internet: não foi possível buscar o resultado.":"Não foi possível buscar o resultado agora. Tente de novo mais tarde.");
+  let got=null, failed=0;
+  for(const f of [getFromOpenF1,getFromJolpica]){
+    try{ const g=await f(race); if(g&&g.ids.length>=10){ got=g; break; } }catch(e){ failed++; }
+  }
+  if(!got){
+    say(failed>=2 ? (navigator.onLine===false?"Sem internet: não foi possível buscar o resultado.":"Não foi possível buscar o resultado agora. Tente de novo mais tarde.") : "Resultado oficial ainda não disponível.");
     return false;
   }
+  const r=rr(raceId); r.fetched=got.ids; r.apiStatus=got.stt; r.src=got.src; r.manual=false; save();
+  if(view==="notas"&&selRace===raceId) render();
+  say("Resultado oficial carregado ("+got.src+")"+(got.miss.length?" — sem cadastro: "+got.miss.join(", "):"")+".");
+  fetchTeamStandings(true);
+  return true;
 }
 
 /* ---------- Classificação oficial de construtores ---------- */

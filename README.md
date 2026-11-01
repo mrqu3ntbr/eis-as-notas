@@ -61,6 +61,24 @@ clique em **Mais informações → Executar assim mesmo**.
 No app: **Arquivo → Abrir pasta dos dados**. Desinstalar o programa **não** apaga essa pasta.
 Para levar os dados a outro computador: **Arquivo → Salvar backup** e, no outro, **Arquivo → Restaurar backup**.
 
+## Backup automático na nuvem
+
+O app não fala com nenhum serviço de nuvem por conta própria (continua 100% offline). Em vez disso, ele grava cópias de segurança numa pasta que **você escolhe**, e o iCloud Drive, OneDrive, Google Drive ou Dropbox enviam essa pasta para a nuvem.
+
+**Como ligar**
+1. Crie uma pasta dentro do seu serviço de nuvem, por exemplo `iCloud Drive/Eis as Notas Backup`.
+2. No app, clique na caixa **Backup automático desligado** (canto inferior da barra lateral) ou use **Arquivo → Escolher pasta de backup automático…** e selecione a pasta.
+
+**O que acontece**
+- Cerca de 20 segundos depois de qualquer alteração, e também ao abrir e ao fechar o app, são gravados:
+  - `Eis as Notas - backup mais recente.json`
+  - uma cópia por dia, `Eis as Notas - backup AAAA-MM-DD.json` (as últimas 30 são mantidas)
+- A caixa na barra lateral mostra: **Backup em dia** (verde), **Salvando backup…**, **Backup pendente** (amarelo: alterações há mais de 10 minutos sem copiar) ou **Backup com problema** (vermelho: pasta sumiu, sem permissão ou sem espaço). Com problema, o app tenta de novo a cada 5 minutos sozinho.
+
+**Restaurar (computador novo ou dados perdidos)**: instale o app, abra **Arquivo → Restaurar backup…** e escolha `backup mais recente.json` na pasta da nuvem.
+
+**Atenção**: não coloque a pasta de dados do app (a de “Abrir pasta dos dados”) dentro da nuvem; sincronizar o arquivo em uso por dois computadores pode gerar conflitos. Use apenas a pasta de backup.
+
 ## 4. Trazer os dados que você já tem (do arquivo HTML)
 
 1. No `eis-as-notas.html` que você usa hoje, clique em **Salvar backup**.
@@ -91,6 +109,7 @@ Para atualizar: `npm install electron@latest electron-builder@latest`.
 | `index.html` | O aplicativo (a mesma página, usando o arquivo de dados quando está no Electron) |
 | `main.js` | Abre a janela, o menu em português e grava/lê o arquivo de dados |
 | `preload.js` | Ponte segura entre a página e o arquivo de dados |
+| `backup.js` | Backup automático para a pasta da nuvem escolhida (cópia mais recente + 1 por dia, aviso de falha) |
 | `storage.js` | Gravação segura em arquivo (temporário → renomeia), cópia `.bak` e snapshots diários |
 | `build/icon.png` | Ícone (logo GP), usado para gerar `.icns` e `.ico` |
 | `.github/workflows/build.yml` | Gera o `.dmg` e o `.exe` no GitHub |

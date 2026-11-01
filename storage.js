@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 
-function createStore(dir) {
+function createStore(dir, opts = {}) {
   const file = path.join(dir, "eis-as-notas.json");
   const bak = file + ".bak";
   const tmp = file + ".tmp";
@@ -55,6 +55,7 @@ function createStore(dir) {
     await fs.promises.writeFile(tmp, data, "utf8");
     if (fs.existsSync(file)) await fs.promises.copyFile(file, bak).catch(() => {});
     await fs.promises.rename(tmp, file);
+    if (opts.onSaved) { try { opts.onSaved(data); } catch (e) { /* gancho nunca atrapalha a gravação */ } }
   }
 
   function save(json) {

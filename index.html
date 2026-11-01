@@ -134,6 +134,10 @@ dialog input[type=text],dialog select{width:100%}
 .toast.on{opacity:1;transform:none}
 svg text{fill:var(--muted);font-size:11px}
 .legend span{margin-right:16px;font-size:13px}
+.stb{display:inline-block;margin-left:8px;border-radius:6px;padding:1px 8px;font-size:11px;font-weight:800;letter-spacing:.04em;cursor:pointer;user-select:none;vertical-align:middle}
+.st-DNF{background:#e1060033;color:#ff6b61}.st-DNS{background:#f1c40f26;color:#f1c40f}.st-DSQ{background:#ffffff1f;color:#fff}
+.st-none{background:transparent;color:var(--muted);opacity:0;border:1px dashed var(--line)}
+tr:hover .st-none{opacity:.7}
 .tag{display:inline-block;background:#e1060022;color:var(--red2);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
 @media(max-width:800px){body{flex-direction:column}aside{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;padding:8px}.logo{border:0;padding:6px}
   .brand{width:48px;margin:6px 4px 6px 8px}nav{display:flex;flex-wrap:wrap}.side-foot{display:none}main{padding:18px 14px}}
@@ -306,7 +310,7 @@ function defaults(){
   return activate({
     version:4, season:2026, evaluators:["Avaliador 1","Avaliador 2","Avaliador 3","Avaliador 4"],
     teams:TEAMS0.map(([id,name,color])=>({id,name,color,logo:null,car:null})),
-    drivers:DRIVERS0.map(([name,team],i)=>({id:"d"+(i+1),name,team,photo:null})),
+    drivers:DRIVERS0.map(([name,team],i)=>({id:"d"+(i+1),name,team,photo:null,sub:name==="Yuki Tsunoda"})),
     seasons:{"2026":{races:RACES0.map(([name,circuit,date],i)=>({id:"r"+(i+1),name,circuit,date})),ratings:{}},
              "2027":{races:mk27(),ratings:{}}}
   },2026);
@@ -327,7 +331,7 @@ function migrateV2(o){
 function migrateV3(o){
   o=migrateV2(o);
   if(o.version<3){ // Tsunoda substituiu o Hadjar (lesionado) em 3 GPs
-    if(!o.drivers.some(d=>d.name==="Yuki Tsunoda")) o.drivers.push({id:"d23",name:"Yuki Tsunoda",team:"rb",photo:null});
+    if(!o.drivers.some(d=>d.name==="Yuki Tsunoda")) o.drivers.push({id:"d23",name:"Yuki Tsunoda",team:"rb",photo:null,sub:true});
     o.version=3;
   }
   return o;
@@ -336,6 +340,7 @@ function migrate(o){
   o=migrateV3(o);
   if(!o.seasons){ o.seasons={"2026":{races:o.races,ratings:o.ratings},"2027":{races:mk27(),ratings:{}}}; }
   if(!o.seasons["2027"]) o.seasons["2027"]={races:mk27(),ratings:{}};
+  { const t=(o.drivers||[]).find(d=>d.id==="d23"&&d.name==="Yuki Tsunoda"); if(t&&t.sub===undefined) t.sub=true; }
   if(!Array.isArray(o.evaluators)) o.evaluators=[];
   while(o.evaluators.length<4) o.evaluators.push("Avaliador "+(o.evaluators.length+1));
   o.version=4;
@@ -403,13 +408,13 @@ async function fetchResult(raceId,silent){
     const j=await jget(year+"/"+hit.round+"/results.json?limit=100");
     const list=(((j.MRData.RaceTable.Races||[])[0]||{}).Results)||[];
     if(list.length<10){ say("Resultado oficial ainda não disponível."); return false; }
-    const ids=[], miss=[];
+    const ids=[], miss=[], stt={};
     list.slice().sort((a,b)=>(+a.position)-(+b.position)).forEach(x=>{
       const nm=noAcc(x.Driver&&x.Driver.familyName); const id=SN[nm];
-      if(id&&!ids.includes(id)) ids.push(id); else if(!id) miss.push(nm);
+      if(id&&!ids.includes(id)){ ids.push(id); const v=stFromApi(x); if(v) stt[id]=v; } else if(!id) miss.push(nm);
     });
     if(ids.length<10){ say("Não consegui reconhecer os pilotos do resultado."); return false; }
-    const r=rr(raceId); r.fetched=ids; r.manual=false; save();
+    const r=rr(raceId); r.fetched=ids; r.apiStatus=stt; r.manual=false; save();
     if(view==="notas"&&selRace===raceId) render();
     say("Resultado oficial carregado"+(miss.length?" (sem cadastro: "+miss.join(", ")+")":"")+".");
     fetchTeamStandings(true);
@@ -451,13 +456,33 @@ async function fetchTeamStandings(silent){
   }
 }
 
+/* ---------- Quem correu em cada GP (22 pilotos) e status DNF/DNS/DSQ ---------- */
+function partsOf(raceId,r){
+  const off=r.fetched||RESULTS[raceId];
+  const base=off? off.slice() : S.drivers.filter(d=>!d.sub).map(d=>d.id);   // sem resultado: o grid titular (22)
+  S.drivers.forEach(d=>{ const a=r.drivers[d.id]; if(a&&a.some(x=>x!=null)&&!base.includes(d.id)) base.push(d.id); }); // nunca esconde quem já tem nota
+  return base;
+}
+const ST_CYCLE=["","DNF","DNS","DSQ"];
+const stOf=(r,id)=> (r.status&&Object.prototype.hasOwnProperty.call(r.status,id)) ? r.status[id] : ((r.apiStatus||{})[id]||"");
+const stTag=(r,id)=>{ const v=stOf(r,id); return v?` <span class="stb st-${v}">${v}</span>`:""; };
+function stFromApi(x){
+  const pt=String(x.positionText||"").toUpperCase(), st=String(x.status||"");
+  if(pt==="W"||/did not start|withdr|did not qualify|did not prequalify/i.test(st)) return "DNS";
+  if(pt==="D"||pt==="E"||/disqualif|exclu/i.test(st)) return "DSQ";
+  if(pt==="R"||pt==="N") return "DNF";
+  if(/^\d+$/.test(pt)) return "";
+  return (st===""||st==="Finished"||/^\+\d+ Lap/i.test(st)) ? "" : "DNF";
+}
+
 function rr(raceId){ // garante registro da corrida
   if(!S.ratings[raceId]) S.ratings[raceId]={drivers:{},teams:{},race:[null,null,null,null],order:S.drivers.map(d=>d.id)};
   const r=S.ratings[raceId];
   const off=r.fetched||RESULTS[raceId]; if(!r.manual && off) r.order=off.slice();   // ordem oficial, a menos que o usuário tenha reordenado
   // sincroniza ordem com pilotos existentes
-  r.order=r.order.filter(id=>driverOf(id));
-  S.drivers.forEach(d=>{ if(!r.order.includes(d.id)) r.order.push(d.id); });
+  const P=partsOf(raceId,r);
+  r.order=r.order.filter(id=>driverOf(id)&&P.includes(id));
+  P.forEach(id=>{ if(driverOf(id)&&!r.order.includes(id)) r.order.push(id); });
   return r;
 }
 const hasRating = raceId => { const r=S.ratings[raceId]; if(!r) return false;
@@ -621,12 +646,12 @@ function vNotas(){
       ${trackPanel(selRace)}
     </div>
 
-    <h2>Pilotos <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem de chegada (arraste ☰ ou use ▲▼)</span>${(r.fetched||RESULTS[selRace])?` <button class="btn sm" id="resetOrd" style="margin-left:10px;text-transform:none;letter-spacing:0">↺ Ordem oficial</button>`:""}${raceOf(selRace).date<=todayISO()?` <button class="btn sm" id="fetchRes" style="margin-left:6px;text-transform:none;letter-spacing:0" title="Busca a classificação final na internet">⟳ Buscar resultado</button>`:""}</h2>
+    <h2>Pilotos <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem de chegada (arraste ☰ ou use ▲▼; clique em ＋ para marcar DNF/DNS/DSQ)</span>${(r.fetched||RESULTS[selRace])?` <button class="btn sm" id="resetOrd" style="margin-left:10px;text-transform:none;letter-spacing:0">↺ Ordem oficial</button>`:""}${raceOf(selRace).date<=todayISO()?` <button class="btn sm" id="fetchRes" style="margin-left:6px;text-transform:none;letter-spacing:0" title="Busca a classificação final na internet">⟳ Buscar resultado</button>`:""}</h2>
     <div class="tablewrap"><table id="tblD" class="gt">${NCOLS}<thead><tr><th></th><th>Pos</th><th>Piloto</th>${evHead}<th class="num">Média</th><th></th></tr></thead><tbody>
       ${r.order.map((id,i)=>{ const d=driverOf(id),t=teamOf(d.team); const a=r.drivers[id]||[null,null,null,null];
         return `<tr draggable="true" data-idx="${i}" data-did="${id}">
           <td class="handle">☰</td><td class="pos">${i+1}</td>
-          <td><div class="row">${avatar(d)}<div><b>${esc(d.name)}</b>${RESULTS[selRace]&&!RESULTS[selRace].includes(id)?' <span class="tag" style="background:#ffffff14;color:#aaa">não correu</span>':""}<div class="muted" style="font-size:12px"><span class="team-dot" style="background:${t?t.color:"#444"}"></span>${esc(t?t.name:"")}</div></div></div></td>
+          <td><div class="row">${avatar(d)}<div><b>${esc(d.name)}</b><span class="stwrap"><span class="stb st-${stOf(r,id)||"none"}" data-st="${id}" title="Clique para marcar DNF / DNS / DSQ">${stOf(r,id)||"＋"}</span></span><div class="muted" style="font-size:12px"><span class="team-dot" style="background:${t?t.color:"#444"}"></span>${esc(t?t.name:"")}</div></div></div></td>
           ${notaCells("drivers",id,a)}
           <td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}" data-avg="drivers:${id}">${fmt(avg3(a))}</span></td>
           <td><button class="btn sm" data-mv="-1">▲</button> <button class="btn sm" data-mv="1">▼</button></td></tr>`;}).join("")}
@@ -646,7 +671,7 @@ function vNotas(){
 
   $("#raceSel").onchange=e=>{ selRace=e.target.value; render(); };
   const fr=$("#fetchRes"); if(fr) fr.onclick=async()=>{ fr.disabled=true; fr.textContent="Buscando…"; await fetchResult(selRace,false); if(document.body.contains(fr)){ fr.disabled=false; fr.textContent="⟳ Buscar resultado"; } };
-  if(!r.fetched && !RESULTS[selRace] && !r.manual && raceOf(selRace).date<=todayISO() && !resTried.has(selRace)){ resTried.add(selRace); fetchResult(selRace,true); }
+  if(!r.fetched && !r.manual && raceOf(selRace).date<=todayISO() && !resTried.has(selRace)){ resTried.add(selRace); fetchResult(selRace,true); }
   const ro=$("#resetOrd"); if(ro) ro.onclick=()=>{ r.manual=false; save(); render(); toast("Ordem oficial restaurada"); };
   $$(".evn").forEach(inp=>inp.onchange=()=>{ S.evaluators[+inp.dataset.i]=inp.value.trim()||("Avaliador "+(+inp.dataset.i+1)); save(); render(); });
   $$(".nota").forEach(inp=>{
@@ -665,6 +690,10 @@ function vNotas(){
     inp.onblur=()=>{ const {val}=parseNota(inp.value); if(val!=null) inp.value=fmtIn(val); };
     inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); const all=$$(".nota"); const n=all[all.indexOf(inp)+1]; if(n){n.focus();n.select();} } };
     inp.onfocus=()=>inp.select();
+  });
+  $$("[data-st]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.st; const cur=stOf(r,id); const nx=ST_CYCLE[(ST_CYCLE.indexOf(cur)+1)%ST_CYCLE.length];
+    if(!r.status) r.status={}; r.status[id]=nx; save(); const y=window.scrollY; render(); window.scrollTo(0,y);
   });
   // mover posição
   $$("[data-mv]").forEach(b=>b.onclick=()=>{
@@ -749,7 +778,7 @@ function vHistorico(){
       ${histRace?`<span class="tag">Média da corrida: ${tv(raceAvg(histRace))}</span>`:""}</div>
     ${r?`<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
       <div class="tablewrap"><table><thead><tr><th>Pos</th><th>Piloto</th>${S.evaluators.map(n=>`<th class="num">${esc(n)}</th>`).join("")}<th class="num">Média</th></tr></thead><tbody>
-        ${r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return `<tr><td class="pos">${i+1}</td><td>${esc(d.name)}</td>${[0,1,2,3].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}
+        ${r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return `<tr><td class="pos">${i+1}</td><td>${esc(d.name)}${stTag(r,id)}</td>${[0,1,2,3].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}
       </tbody></table></div>
       <div class="tablewrap" style="align-self:start"><table><thead><tr><th>Equipe</th>${S.evaluators.map(n=>`<th class="num">${esc(n)}</th>`).join("")}<th class="num">Média</th></tr></thead><tbody>
         ${S.teams.map(t=>{ const a=r.teams[t.id]||[]; return `<tr><td><span class="team-dot" style="background:${t.color}"></span>${esc(t.name)}</td>${[0,1,2,3].map(k=>`<td class="num">${fmt(a[k]??null)}</td>`).join("")}<td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}">${fmt(avg3(a))}</span></td></tr>`;}).join("")}

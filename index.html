@@ -408,9 +408,17 @@ async function ufetch(url){
   finally{ clearTimeout(t); }
 }
 const SNL=Object.fromEntries(Object.entries(SN).map(([k,v])=>[k.toLowerCase(),v]));
-const surId=n=>SNL[noAcc(n).toLowerCase().trim()];
+const slugN=s=>noAcc(s).toLowerCase().replace(/[^a-z]/g,"");
+function surId(n){ // reconhece o piloto pelo sobrenome (tabela fixa ou pilotos cadastrados, inclusive os criados automaticamente)
+  const k=noAcc(n).toLowerCase().trim(); if(!k) return null;
+  if(SNL[k]&&driverOf(SNL[k])) return SNL[k];
+  const sl=slugN(n); if(!sl) return null;
+  const d=S.drivers.find(d=>slugN(d.name).endsWith(sl)); return d?d.id:null;
+}
+const tcase=s=>String(s||"").split(/\s+/).map(w=>(w.length>1&&w===w.toUpperCase())? w[0]+w.slice(1).toLowerCase() : w).join(" ");
 const OF1="https://api.openf1.org/v1/", of1Cache={};
-/* Fonte 1: OpenF1 (rápida). Devolve {ids,stt,miss,src} ou null se ainda não há resultado. */
+/* Fonte 1: OpenF1 (rápida). Devolve {entries,src} ou null se ainda não há resultado.
+   entry = {sur, full, team:{id,name}, st} na ordem de chegada. */
 async function getFromOpenF1(race){
   const year=race.date.slice(0,4);
   if(!of1Cache[year]) of1Cache[year]=await ufetch(OF1+"sessions?year="+year+"&session_name=Race");
@@ -424,16 +432,13 @@ async function getFromOpenF1(race){
     const pa=typeof a.position==="number"?a.position:999, pb=typeof b.position==="number"?b.position:999;
     return pa!==pb? pa-pb : (b.number_of_laps||0)-(a.number_of_laps||0);
   });
-  const ids=[], stt={}, miss=[];
-  ord.forEach(x=>{
-    const d=byNum[x.driver_number]||{}; const nm=d.last_name||String((d.full_name||"").split(" ").slice(-1)[0]||"");
-    const id=surId(nm)||surId(String(d.full_name||"").split(" ").slice(1).join(" "));
-    if(!id){ if(nm) miss.push(nm); return; }
-    if(ids.includes(id)) return;
-    ids.push(id);
-    const v=x.dsq?"DSQ":x.dns?"DNS":x.dnf?"DNF":""; if(v) stt[id]=v;
-  });
-  return {ids,stt,miss,src:"OpenF1"};
+  const entries=ord.map(x=>{
+    const d=byNum[x.driver_number]||{};
+    const full=tcase(d.full_name||((d.first_name||"")+" "+(d.last_name||"")));
+    const sur=tcase(d.last_name||full.split(" ").slice(-1)[0]||"");
+    return {sur,full:full||sur,team:{id:"",name:d.team_name||""},st:x.dsq?"DSQ":x.dns?"DNS":x.dnf?"DNF":""};
+  }).filter(e=>e.sur);
+  return {entries,src:"OpenF1"};
 }
 /* Fonte 2: Jolpica/Ergast (mais lenta, usada se a OpenF1 falhar ou ainda não tiver o resultado). */
 async function getFromJolpica(race){
@@ -445,27 +450,44 @@ async function getFromJolpica(race){
   const j=await jget(year+"/"+hit.round+"/results.json?limit=100");
   const list=(((j.MRData.RaceTable.Races||[])[0]||{}).Results)||[];
   if(list.length<10) return null;
-  const ids=[], miss=[], stt={};
-  list.slice().sort((a,b)=>(+a.position)-(+b.position)).forEach(x=>{
-    const nm=noAcc(x.Driver&&x.Driver.familyName); const id=surId(nm);
-    if(id&&!ids.includes(id)){ ids.push(id); const v=stFromApi(x); if(v) stt[id]=v; } else if(!id) miss.push(nm);
+  const entries=list.slice().sort((a,b)=>(+a.position)-(+b.position)).map(x=>{
+    const d=x.Driver||{}, c=x.Constructor||{};
+    return {sur:d.familyName||"",full:((d.givenName||"")+" "+(d.familyName||"")).trim(),team:{id:c.constructorId||"",name:c.name||""},st:stFromApi(x)};
+  }).filter(e=>e.sur);
+  return {entries,src:"Jolpica"};
+}
+/* Converte as entradas em ids; piloto que ainda não existe no app é cadastrado na hora (como reserva,
+   para só aparecer nas corridas em que realmente correu). */
+function resolveEntries(entries){
+  const ids=[], stt={}, created=[];
+  entries.forEach(e=>{
+    let id=surId(e.sur);
+    if(!id){
+      const tid=teamFromC({constructorId:e.team.id,name:e.team.name});
+      let n=S.drivers.reduce((m,d)=>Math.max(m,+String(d.id).replace(/\D/g,"")||0),0)+1; while(driverOf("d"+n)) n++;
+      id="d"+n; S.drivers.push({id,name:e.full||e.sur,team:tid||(S.teams[0]&&S.teams[0].id)||"",photo:null,sub:true});
+      created.push({name:e.full||e.sur,team:tid?(teamOf(tid)||{}).name:"(defina a equipe)"});
+    }
+    if(!ids.includes(id)){ ids.push(id); if(e.st) stt[id]=e.st; }
   });
-  return {ids,stt,miss,src:"Jolpica"};
+  return {ids,stt,created};
 }
 async function fetchResult(raceId,silent){
   const race=raceOf(raceId); if(!race||!race.date) return false;
   const say=m=>{ if(!silent) toast(m); };
   let got=null, failed=0;
   for(const f of [getFromOpenF1,getFromJolpica]){
-    try{ const g=await f(race); if(g&&g.ids.length>=10){ got=g; break; } }catch(e){ failed++; }
+    try{ const g=await f(race); if(g&&g.entries.length>=10){ got=g; break; } }catch(e){ failed++; }
   }
   if(!got){
     say(failed>=2 ? (navigator.onLine===false?"Sem internet: não foi possível buscar o resultado.":"Não foi possível buscar o resultado agora. Tente de novo mais tarde.") : "Resultado oficial ainda não disponível.");
     return false;
   }
-  const r=rr(raceId); r.fetched=got.ids; r.apiStatus=got.stt; r.src=got.src; r.manual=false; save();
-  if(view==="notas"&&selRace===raceId) render();
-  say("Resultado oficial carregado ("+got.src+")"+(got.miss.length?" — sem cadastro: "+got.miss.join(", "):"")+".");
+  const rs=resolveEntries(got.entries);
+  const r=rr(raceId); r.fetched=rs.ids; r.apiStatus=rs.stt; r.src=got.src; r.manual=false; save();
+  if(view==="notas"&&selRace===raceId) render(); else if(view==="pilotos"&&rs.created.length) render();
+  const msg="Resultado oficial carregado ("+got.src+")."+(rs.created.length?" Piloto(s) cadastrado(s): "+rs.created.map(c=>c.name+" — "+c.team).join("; ")+".":"");
+  if(rs.created.length) toast(msg); else say(msg);
   fetchTeamStandings(true);
   return true;
 }

@@ -143,6 +143,8 @@ svg text{fill:var(--muted);font-size:11px}
 .st-DNF{background:#e1060033;color:#ff6b61}.st-DNS{background:#f1c40f26;color:#f1c40f}.st-DSQ{background:#ffffff1f;color:#fff}
 .st-none{background:transparent;color:var(--muted);opacity:0;border:1px dashed var(--line)}
 tr:hover .st-none{opacity:.7}
+.tsel{background:transparent;border:0;padding:0;margin:0;font-size:12px;color:var(--muted);cursor:pointer;max-width:150px;outline:none}
+.tsel option{background:var(--panel);color:var(--text)}
 .tag{display:inline-block;background:#e1060022;color:var(--red2);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
 @media(max-width:800px){body{flex-direction:column}aside{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;padding:8px}.logo{border:0;padding:6px}
   .brand{width:48px;margin:6px 4px 6px 8px}nav{display:flex;flex-wrap:wrap}.side-foot{display:none}main{padding:18px 14px}}
@@ -403,6 +405,10 @@ const fmtIn = n=> n==null ? "" : String(n).replace(".",",");
 function parseNota(v){
   v=String(v).trim().replace(",",".");
   if(v===""||v==="-") return {val:null,bad:false};   // "-" sozinho: ainda digitando
+  { // só dígitos: 55 vira 5,5 · 11 vira 1,1 · 855 vira 8,55 · 10 e 100 valem 10
+    const neg=v[0]==="-", dg=neg?v.slice(1):v;
+    if(/^\d{2,}$/.test(dg) && dg!=="10") v=(neg?"-":"")+(dg==="100"?"10":dg[0]+"."+dg.slice(1));
+  }
   const n=Number(v);
   if(!isFinite(n)||n<-10||n>10) return {val:null,bad:true};
   return {val:Math.round(n*100)/100,bad:false};
@@ -486,7 +492,7 @@ async function getFromJolpica(race){
 /* Converte as entradas em ids; piloto que ainda não existe no app é cadastrado na hora (como reserva,
    para só aparecer nas corridas em que realmente correu). */
 function resolveEntries(entries){
-  const ids=[], stt={}, created=[];
+  const ids=[], stt={}, created=[], tm={};
   entries.forEach(e=>{
     let id=surId(e.sur);
     if(!id){
@@ -496,8 +502,9 @@ function resolveEntries(entries){
       created.push({name:e.full||e.sur,team:tid?(teamOf(tid)||{}).name:"(defina a equipe)"});
     }
     if(!ids.includes(id)){ ids.push(id); if(e.st) stt[id]=e.st; }
+    const tt=teamFromC({constructorId:e.team.id,name:e.team.name}); if(tt) tm[id]=tt;   // equipe em que ele correu
   });
-  return {ids,stt,created};
+  return {ids,stt,created,tm};
 }
 async function fetchResult(raceId,silent){
   const race=raceOf(raceId); if(!race||!race.date) return false;
@@ -511,7 +518,7 @@ async function fetchResult(raceId,silent){
     return false;
   }
   const rs=resolveEntries(got.entries);
-  const r=rr(raceId); r.fetched=rs.ids; r.apiStatus=rs.stt; r.src=got.src; r.manual=false; save();
+  const r=rr(raceId); r.fetched=rs.ids; r.apiStatus=rs.stt; r.apiTeam=rs.tm; r.src=got.src; r.manual=false; save();
   if(view==="notas"&&selRace===raceId) render(); else if(view==="pilotos"&&rs.created.length) render();
   const msg="Resultado oficial carregado ("+got.src+")."+(rs.created.length?" Piloto(s) cadastrado(s): "+rs.created.map(c=>c.name+" — "+c.team).join("; ")+".":"");
   if(rs.created.length) toast(msg); else say(msg);
@@ -571,10 +578,18 @@ function stFromApi(x){
 
 /* Ordem das equipes numa corrida: pela primeira aparição de cada equipe na ordem de chegada dos pilotos
    (equipe que já apareceu é pulada). Se o usuário arrastar, vale a ordem dele até clicar em "Ordem automática". */
-function teamsOrder(r){
+/* Equipe de cada piloto NUMA corrida (substituições). Prioridade: ajuste manual > equipe informada pela API > tabela abaixo > equipe padrão.
+   Tabela: sem o Hadjar (lesionado) o Lawson foi para a Red Bull e o Tsunoda ocupou a vaga na Racing Bulls. */
+const TEAM_SWAP={r12:{d15:"redbull",d23:"rb"},r13:{d15:"redbull",d23:"rb"},r14:{d15:"redbull",d23:"rb"}};
+function dteam(id,raceId){
+  const d=driverOf(id); if(!d) return null; const r=S.ratings[raceId]||{};
+  return (r.teamOv&&r.teamOv[id])||(r.apiTeam&&r.apiTeam[id])||((TEAM_SWAP[raceId]||{})[id])||d.team;
+}
+
+function teamsOrder(r,raceId){
   let ids=[];
   if(r.teamsManual&&Array.isArray(r.teamOrder)) ids=r.teamOrder.slice();
-  else (r.order||[]).forEach(id=>{ const d=driverOf(id); if(d&&teamOf(d.team)&&!ids.includes(d.team)) ids.push(d.team); });
+  else (r.order||[]).forEach(id=>{ const tid=dteam(id,raceId); if(tid&&teamOf(tid)&&!ids.includes(tid)) ids.push(tid); });
   S.teams.forEach(t=>{ if(!ids.includes(t.id)) ids.push(t.id); });
   return ids.filter(id=>teamOf(id));
 }
@@ -740,7 +755,7 @@ function vNotas(){
   const evHead=ev.map((n,i)=>`<th class="evc"><input type="text" class="evn" data-i="${i}" value="${esc(n)}" style="width:92px;text-align:center;padding:4px"></th>`).join("");
   M().innerHTML=`
     <h1>Notas</h1>
-    <p class="sub">Digite as notas (-10 a 10). A média aparece sozinha quando há pelo menos três notas, e tudo é salvo na hora.</p>
+    <p class="sub">Digite as notas (-10 a 10); dica: digitar 55 vira 5,5, 11 vira 1,1 e 10 vale 10. A média aparece sozinha quando há pelo menos três notas, e tudo é salvo na hora.</p>
     <div class="hero">
       <div class="toolbar" style="margin:0;flex-direction:column;align-items:flex-start">
         <select id="raceSel">${S.races.map(x=>`<option value="${x.id}" ${x.id===selRace?"selected":""}>${hasRating(x.id)?"✔ ":""}${esc(x.name)} (${fdate(x.date)})</option>`).join("")}</select>
@@ -752,10 +767,10 @@ function vNotas(){
 
     <h2>Pilotos <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem de chegada (arraste ☰ ou use ▲▼; clique em ＋ para marcar DNF/DNS/DSQ)</span>${(r.fetched||RESULTS[selRace])?` <button class="btn sm" id="resetOrd" style="margin-left:10px;text-transform:none;letter-spacing:0">↺ Ordem oficial</button>`:""}${raceOf(selRace).date<=todayISO()?` <button class="btn sm" id="fetchRes" style="margin-left:6px;text-transform:none;letter-spacing:0" title="Busca a classificação final na internet">⟳ Buscar resultado</button>`:""}</h2>
     <div class="tablewrap"><table id="tblD" class="gt">${NCOLS}<thead><tr><th></th><th>Pos</th><th>Piloto</th>${evHead}<th class="num">Média</th><th></th></tr></thead><tbody>
-      ${r.order.map((id,i)=>{ const d=driverOf(id),t=teamOf(d.team); const a=r.drivers[id]||[null,null,null,null];
+      ${r.order.map((id,i)=>{ const d=driverOf(id),tid=dteam(id,selRace),t=teamOf(tid); const a=r.drivers[id]||[null,null,null,null];
         return `<tr draggable="true" data-idx="${i}" data-did="${id}">
           <td class="handle">☰</td><td class="pos">${i+1}</td>
-          <td><div class="row">${avatar(d)}<div><b>${esc(d.name)}</b><span class="stwrap"><span class="stb st-${stOf(r,id)||"none"}" data-st="${id}" title="Clique para marcar DNF / DNS / DSQ">${stOf(r,id)||"＋"}</span></span><div class="muted" style="font-size:12px"><span class="team-dot" style="background:${t?t.color:"#444"}"></span>${esc(t?t.name:"")}</div></div></div></td>
+          <td><div class="row">${avatar(d)}<div><b>${esc(d.name)}</b><span class="stwrap"><span class="stb st-${stOf(r,id)||"none"}" data-st="${id}" title="Clique para marcar DNF / DNS / DSQ">${stOf(r,id)||"＋"}</span></span><div class="muted" style="font-size:12px"><span class="team-dot" style="background:${t?t.color:"#444"}"></span><select class="tsel" data-tsel="${id}" title="Equipe deste piloto nesta corrida (troque em caso de substituição)">${S.teams.map(x=>`<option value="${x.id}" ${x.id===tid?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div></div></div></td>
           ${notaCells("drivers",id,a)}
           <td class="num"><span class="avg ${avg3(a)!=null?"has":""} ${tone(avg3(a))}" data-avg="drivers:${id}">${fmt(avg3(a))}</span></td>
           <td><button class="btn sm" data-mv="-1">▲</button> <button class="btn sm" data-mv="1">▼</button></td></tr>`;}).join("")}
@@ -763,7 +778,7 @@ function vNotas(){
 
     <h2>Equipes <span class="muted" style="text-transform:none;letter-spacing:0">— na ordem da corrida (arraste ☰ ou use ▲▼)</span>${r.teamsManual?` <button class="btn sm" id="resetTeams" style="margin-left:10px;text-transform:none;letter-spacing:0">↺ Ordem automática</button>`:""}</h2>
     <div class="tablewrap"><table id="tblT" class="gt">${NCOLS}<thead><tr><th></th><th>Pos</th><th>Equipe</th>${evHead}<th class="num">Média</th><th></th></tr></thead><tbody>
-      ${teamsOrder(r).map((tid,i)=>{ const t=teamOf(tid); const a=r.teams[t.id]||[null,null,null,null];
+      ${teamsOrder(r,selRace).map((tid,i)=>{ const t=teamOf(tid); const a=r.teams[t.id]||[null,null,null,null];
         return `<tr draggable="true" data-tidx="${i}">
           <td class="handle">☰</td><td class="pos">${i+1}</td>
           <td><span class="team-dot" style="background:${t.color}"></span><b>${esc(t.name)}</b></td>
@@ -803,7 +818,7 @@ function vNotas(){
     if(!r.status) r.status={}; r.status[id]=nx; save(); const y=window.scrollY; render(); window.scrollTo(0,y);
   });
   $$("[data-tmv]").forEach(b=>b.onclick=()=>{
-    const ids=teamsOrder(r), i=+b.closest("tr").dataset.tidx, j=i+ +b.dataset.tmv;
+    const ids=teamsOrder(r,selRace), i=+b.closest("tr").dataset.tidx, j=i+ +b.dataset.tmv;
     if(j<0||j>=ids.length) return;
     [ids[i],ids[j]]=[ids[j],ids[i]]; r.teamOrder=ids; r.teamsManual=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y);
   });
@@ -813,9 +828,10 @@ function vNotas(){
     tr.ondragover=e=>{ e.preventDefault(); tr.classList.add("dragover"); };
     tr.ondragleave=()=>tr.classList.remove("dragover");
     tr.ondrop=e=>{ e.preventDefault(); const to=+tr.dataset.tidx; if(tfrom==null||tfrom===to) return;
-      const ids=teamsOrder(r); const [m]=ids.splice(tfrom,1); ids.splice(to,0,m); r.teamOrder=ids; r.teamsManual=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); };
+      const ids=teamsOrder(r,selRace); const [m]=ids.splice(tfrom,1); ids.splice(to,0,m); r.teamOrder=ids; r.teamsManual=true; save(); const y=window.scrollY; render(); window.scrollTo(0,y); };
   });
   const rt=$("#resetTeams"); if(rt) rt.onclick=()=>{ r.teamsManual=false; r.teamOrder=null; save(); render(); toast("Ordem automática das equipes restaurada"); };
+  $$("[data-tsel]").forEach(sl=>sl.onchange=()=>{ if(!r.teamOv) r.teamOv={}; r.teamOv[sl.dataset.tsel]=sl.value; save(); const y=window.scrollY; render(); window.scrollTo(0,y); });
   // mover posição
   $$("[data-mv]").forEach(b=>b.onclick=()=>{
     const tr=b.closest("tr"); const i=+tr.dataset.idx, j=i+ +b.dataset.mv;
@@ -897,8 +913,8 @@ function vHistorico(){
     <div class="toolbar"><select id="hRace">${S.races.map(x=>`<option value="${x.id}" ${x.id===histRace?"selected":""}>${hasRating(x.id)?"✔ ":""}${esc(x.name)}</option>`).join("")}</select>
       ${histRace?`<span class="tag">Média da corrida: ${tv(raceAvg(histRace))}</span>`:""}</div>
     ${r?`<div style="display:grid;gap:16px">
-      ${barChart(`<span>Pilotos</span>`,byAvg(r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return {n:i+1,label:esc(d.name)+stTag(r,id),v:avg3(a),color:(teamOf(d.team)||{}).color,title:d.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; })))}
-      <div>${barChart(`<span>Equipes</span>`,byAvg(teamsOrder(r).map((tid,i)=>{ const t=teamOf(tid),a=r.teams[tid]||[]; return {n:i+1,label:esc(t.name),v:avg3(a),color:t.color,title:t.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; })))}</div></div>`:""}
+      ${barChart(`<span>Pilotos</span>`,byAvg(r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return {n:i+1,label:esc(d.name)+stTag(r,id),v:avg3(a),color:(teamOf(dteam(id,histRace))||{}).color,title:d.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; })))}
+      <div>${barChart(`<span>Equipes</span>`,byAvg(teamsOrder(r,histRace).map((tid,i)=>{ const t=teamOf(tid),a=r.teams[tid]||[]; return {n:i+1,label:esc(t.name),v:avg3(a),color:t.color,title:t.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; })))}</div></div>`:""}
 
     <h2>Evolução</h2>
     <div class="toolbar">
@@ -939,8 +955,8 @@ function racesChart(){
   const best=rated.length?Math.max(...rated):null;
   const bi=best!=null?avgs.indexOf(best):-1;
   const short=n=>n.replace(/^GP (?:d[aeo]s?\s)?/,"");
-  const rows=S.races.map((r,i)=>({n:i+1,label:esc(short(r.name)),v:avgs[i],best:best!=null&&avgs[i]===best,title:r.name+": "+(avgs[i]!=null?fmt(avgs[i]):"sem notas")}));
-  return barChart(`<span>Média das avaliações por Grande Prêmio, na ordem do calendário</span>
+  const rows=byAvg(S.races.map((r,i)=>({n:i+1,label:esc(short(r.name)),v:avgs[i],best:best!=null&&avgs[i]===best,title:r.name+" (corrida "+(i+1)+" do calendário): "+(avgs[i]!=null?fmt(avgs[i]):"sem notas")})));
+  return barChart(`<span>Média das avaliações por Grande Prêmio, da maior para a menor</span>
       <span>${bi>=0?`Melhor corrida: <b>${esc(short(S.races[bi].name))}</b> (${tv(best)})`:"Nenhuma corrida avaliada ainda"}</span>`,rows);
 }
 function drawChart(){

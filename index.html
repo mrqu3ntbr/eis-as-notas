@@ -146,7 +146,33 @@ tr:hover .st-none{opacity:.7}
 .tag{display:inline-block;background:#e1060022;color:var(--red2);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
 @media(max-width:800px){body{flex-direction:column}aside{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;padding:8px}.logo{border:0;padding:6px}
   .brand{width:48px;margin:6px 4px 6px 8px}nav{display:flex;flex-wrap:wrap}.side-foot{display:none}main{padding:18px 14px}}
+
+/* ---------- Tema claro ---------- */
+:root[data-theme="light"]{color-scheme:light;--bg:#f2f2f6;--panel:#ffffff;--panel2:#eeeef3;--line:#d8d8e0;--text:#17171c;--muted:#666672;--red:#d40600;--red2:#d4140a}
+[data-theme="light"] aside{background:#ffffff}
+[data-theme="light"] .btn:hover{border-color:#a8a8b4}
+[data-theme="light"] .track{background:#fafafc}
+[data-theme="light"] .smenu{box-shadow:0 8px 24px #0002}
+[data-theme="light"] .rc-t{background:repeating-linear-gradient(90deg,transparent 0,transparent calc(20% - 1px),#00000014 calc(20% - 1px),#00000014 20%),#00000008}
+[data-theme="light"] tr:hover td{background:#00000006}
+[data-theme="light"] .nota.bad{background:#fde7e5}
+[data-theme="light"] .av{background:#d9d9e0}
+[data-theme="light"] .rank{color:#00000018}
+[data-theme="light"] .pcard,[data-theme="light"] .pcard .pfall{color:#f2f2f4}
+[data-theme="light"] dialog::backdrop{background:#0006}
+[data-theme="light"] .t-g{color:#178a46!important}
+[data-theme="light"] .t-y{color:#a87c00!important}
+[data-theme="light"] .t-r{color:#d4140a!important}
+[data-theme="light"] .rc-r.best .rc-v{color:#178a46!important}
+[data-theme="light"] .st-DNF{background:#d4140a1f;color:#c4180c}
+[data-theme="light"] .st-DNS{background:#a87c0026;color:#8a6500}
+[data-theme="light"] .st-DSQ{background:#00000014;color:#222}
+[data-theme="light"] .cloud.ok b{color:#178a46}
+[data-theme="light"] .cloud.warn b{color:#a87c00}
+[data-theme="light"] .cloud.bad{background:#fde7e5}
+[data-theme="light"] #themeBtn{justify-content:center}
 </style>
+<script>try{var t=localStorage.getItem("eisasnotas.theme");if(t==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
 </head>
 <body>
 <button id="sideToggle" type="button" aria-label="Mostrar ou ocultar o menu"></button>
@@ -156,6 +182,7 @@ tr:hover .st-none{opacity:.7}
   <div class="season"><button class="btn" id="seasonBtn" aria-haspopup="true"></button><div class="smenu" id="smenu" hidden></div></div>
   <nav id="nav"></nav>
   <div class="side-foot">
+    <button class="btn" id="themeBtn" type="button"></button>
     <button class="cloud" id="cloudBox" hidden></button>
     <button class="btn" id="bk-exp">⬇ Salvar backup</button>
     <button class="btn" id="bk-imp">⬆ Restaurar backup</button>
@@ -870,8 +897,8 @@ function vHistorico(){
     <div class="toolbar"><select id="hRace">${S.races.map(x=>`<option value="${x.id}" ${x.id===histRace?"selected":""}>${hasRating(x.id)?"✔ ":""}${esc(x.name)}</option>`).join("")}</select>
       ${histRace?`<span class="tag">Média da corrida: ${tv(raceAvg(histRace))}</span>`:""}</div>
     ${r?`<div style="display:grid;gap:16px">
-      ${barChart(`<span>Pilotos</span>`,r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return {n:i+1,label:esc(d.name)+stTag(r,id),v:avg3(a),color:(teamOf(d.team)||{}).color,title:d.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; }))}
-      <div>${barChart(`<span>Equipes</span>`,teamsOrder(r).map((tid,i)=>{ const t=teamOf(tid),a=r.teams[tid]||[]; return {n:i+1,label:esc(t.name),v:avg3(a),color:t.color,title:t.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; }))}</div></div>`:""}
+      ${barChart(`<span>Pilotos</span>`,byAvg(r.order.map((id,i)=>{ const d=driverOf(id),a=r.drivers[id]||[]; return {n:i+1,label:esc(d.name)+stTag(r,id),v:avg3(a),color:(teamOf(d.team)||{}).color,title:d.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; })))}
+      <div>${barChart(`<span>Equipes</span>`,byAvg(teamsOrder(r).map((tid,i)=>{ const t=teamOf(tid),a=r.teams[tid]||[]; return {n:i+1,label:esc(t.name),v:avg3(a),color:t.color,title:t.name+" — "+S.evaluators.map((e,k)=>e+": "+fmt(a[k]??null)).join(" · ")}; })))}</div></div>`:""}
 
     <h2>Evolução</h2>
     <div class="toolbar">
@@ -892,6 +919,7 @@ function vHistorico(){
   drawChart();
 }
 /* Gráfico de barras: média de cada GP, na ordem do calendário */
+const byAvg=rows=>rows.map((x,i)=>({x,i})).sort((a,b)=>((b.x.v??-Infinity)-(a.x.v??-Infinity))||(a.i-b.i)).map((o,k)=>Object.assign({},o.x,{n:k+1}));  // maior média primeiro; sem nota por último
 function barChart(head,rows){
   const body=rows.map(x=>{ const v=x.v, none=v==null;
     const bg=x.color?`background:linear-gradient(90deg,${x.color}66,${x.color});`:"";
@@ -927,7 +955,7 @@ function drawChart(){
   const lo=Math.min(0,Math.floor(Math.min(...pts.map(p=>Math.min(p.v,p.acc)))/2)*2);
   const X=i=>L+(N>1? i*(W-L-R)/(N-1):0), Y=v=>T+(10-v)*(H-T-B)/(10-lo);
   const line=k=>pts.map((p,j)=>(j?"L":"M")+X(p.i).toFixed(1)+","+Y(p[k]).toFixed(1)).join(" ");
-  let g=""; for(let v=lo;v<=10;v+=2) g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#2a2a32"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${v}</text>`;
+  let g=""; for(let v=lo;v<=10;v+=2) g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${v}</text>`;
   S.races.forEach((r,i)=>{ g+=`<text x="${X(i)}" y="${H-8}" text-anchor="middle">${i+1}</text>`; });
   el.innerHTML=`<div class="legend"><span style="color:${color}">● Nota da corrida</span><span style="color:#e10600">● Média acumulada</span></div>
    <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-height:300px">${g}
@@ -1069,6 +1097,17 @@ render();
   const apply=()=>{ document.body.classList.toggle("side-hidden",hid); b.textContent=hid?"☰":"◀"; b.title=hid?"Mostrar menu":"Ocultar menu"; b.setAttribute("aria-expanded",String(!hid)); };
   b.onclick=()=>{ hid=!hid; try{ localStorage.setItem(K,hid?"1":"0"); }catch(e){} apply(); };
   apply();
+})();
+</script>
+<script>
+(function(){
+  const b=document.getElementById("themeBtn"), K="eisasnotas.theme"; const root=document.documentElement;
+  const draw=()=>{ const light=root.getAttribute("data-theme")==="light"; b.textContent=light?"🌙 Tema escuro":"☀️ Tema claro"; };
+  b.onclick=()=>{ const light=root.getAttribute("data-theme")==="light";
+    if(light) root.removeAttribute("data-theme"); else root.setAttribute("data-theme","light");
+    try{ localStorage.setItem(K,light?"dark":"light"); }catch(e){}
+    draw(); };
+  draw();
 })();
 </script>
 </body>

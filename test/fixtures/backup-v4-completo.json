@@ -1,0 +1,874 @@
+{
+ "version": 4,
+ "season": 2026,
+ "evaluators": [
+  "Ana",
+  "Bruno",
+  "Carla",
+  "Dani"
+ ],
+ "teams": [
+  {
+   "id": "mclaren",
+   "name": "McLaren",
+   "color": "#FF8000",
+   "logo": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAAeCAYAAABwmH1PAAAAaElEQVR4AezSsQ3AMBDDQMMrZadMm53i3tyATwNu1En3+3m/f9Lfa9irsB084YRlC3TSMlDUSRiTyIKEZaCokzAmkQUJy0DvOithTCILEpaBok7CmEQWJCwDRZ2EMYksSFgGijrjhA8AAAD//3Yma84AAAAGSURBVAMAlpmPrcj3DbgAAAAASUVORK5CYII=",
+   "car": null
+  },
+  {
+   "id": "mercedes",
+   "name": "Mercedes",
+   "color": "#27F4D2",
+   "logo": null,
+   "car": "data:image/webp;base64,UklGRjwCAABXRUJQVlA4WAoAAAAgAAAAdwAAMQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggTgAAALAEAJ0BKngAMgA+bTaZSaQioqEhCACADYlpAHYAABFqJV6Gj6dOnTp06dOnRwAA/u0HL/9amRj6MX//1wH/zgP/nAf0XHkdAyxCAAAAAA=="
+  },
+  {
+   "id": "ferrari",
+   "name": "Ferrari",
+   "color": "#E8002D",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "redbull",
+   "name": "Red Bull Racing",
+   "color": "#3671C6",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "williams",
+   "name": "Williams",
+   "color": "#64C4FF",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "aston",
+   "name": "Aston Martin",
+   "color": "#229971",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "rb",
+   "name": "Racing Bulls",
+   "color": "#6692FF",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "alpine",
+   "name": "Alpine",
+   "color": "#FF87BC",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "haas",
+   "name": "Haas",
+   "color": "#B6BABD",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "audi",
+   "name": "Audi",
+   "color": "#F50537",
+   "logo": null,
+   "car": null
+  },
+  {
+   "id": "cadillac",
+   "name": "Cadillac",
+   "color": "#9AA0A6",
+   "logo": null,
+   "car": null
+  }
+ ],
+ "drivers": [
+  {
+   "id": "d1",
+   "name": "Max Verstappen",
+   "team": "redbull",
+   "photo": "data:image/webp;base64,UklGRiwCAABXRUJQVlA4WAoAAAAgAAAAJwAAJwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggPgAAAFADAJ0BKigAKAA+bTaYSSQjIqEjiACADYlnANJwDEpQqlBAAPzK/XFzZEUf/52D/4I/+PfMSZjue4IuAAAA",
+   "sub": false
+  },
+  {
+   "id": "d2",
+   "name": "Isack Hadjar",
+   "team": "redbull",
+   "photo": null,
+   "sub": false,
+   "card": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAA8AIwDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAQH/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8ApQGdKwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH/9k="
+  },
+  {
+   "id": "d3",
+   "name": "Charles Leclerc",
+   "team": "ferrari",
+   "photo": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAAcElEQVR4AezSwQkAIBADQbElu7ZJrSAQ2I/gCr7uAjJm7rXPy3eOx48PpB+koIJUgObtoIJUgObtoIJUgObtoIJUgObtoIJUgOZ/6SB1ynkFs003UbBzylsKZptuomDnlLcUzDbdRMHOKW8pmG26yQUAAP//7nVhyQAAAAZJREFUAwAOkGVBsv9KSQAAAABJRU5ErkJggg==",
+   "sub": false
+  },
+  {
+   "id": "d4",
+   "name": "Lewis Hamilton",
+   "team": "ferrari",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d5",
+   "name": "George Russell",
+   "team": "mercedes",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d6",
+   "name": "Kimi Antonelli",
+   "team": "mercedes",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d7",
+   "name": "Lando Norris",
+   "team": "mclaren",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d8",
+   "name": "Oscar Piastri",
+   "team": "mclaren",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d9",
+   "name": "Fernando Alonso",
+   "team": "aston",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d10",
+   "name": "Lance Stroll",
+   "team": "aston",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d11",
+   "name": "Pierre Gasly",
+   "team": "alpine",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d12",
+   "name": "Franco Colapinto",
+   "team": "alpine",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d13",
+   "name": "Alexander Albon",
+   "team": "williams",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d14",
+   "name": "Carlos Sainz",
+   "team": "williams",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d15",
+   "name": "Liam Lawson",
+   "team": "rb",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d16",
+   "name": "Arvid Lindblad",
+   "team": "rb",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d17",
+   "name": "Nico Hülkenberg",
+   "team": "audi",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d18",
+   "name": "Gabriel Bortoleto",
+   "team": "audi",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d19",
+   "name": "Esteban Ocon",
+   "team": "haas",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d20",
+   "name": "Oliver Bearman",
+   "team": "haas",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d21",
+   "name": "Sergio Pérez",
+   "team": "cadillac",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d22",
+   "name": "Valtteri Bottas",
+   "team": "cadillac",
+   "photo": null,
+   "sub": false
+  },
+  {
+   "id": "d23",
+   "name": "Yuki Tsunoda",
+   "team": "rb",
+   "photo": null,
+   "sub": true
+  },
+  {
+   "id": "d24",
+   "name": "Zane Newcomer",
+   "team": "alpine",
+   "photo": null,
+   "sub": true
+  }
+ ],
+ "seasons": {
+  "2026": {
+   "races": [
+    {
+     "id": "r1",
+     "name": "GP da Austrália",
+     "circuit": "Albert Park",
+     "date": "2026-03-08"
+    },
+    {
+     "id": "r2",
+     "name": "GP da China",
+     "circuit": "Xangai",
+     "date": "2026-03-15"
+    },
+    {
+     "id": "r3",
+     "name": "GP do Japão",
+     "circuit": "Suzuka",
+     "date": "2026-03-29",
+     "track": "r3"
+    },
+    {
+     "id": "r4",
+     "name": "GP de Miami",
+     "circuit": "Miami",
+     "date": "2026-05-03"
+    },
+    {
+     "id": "r5",
+     "name": "GP do Canadá",
+     "circuit": "Montreal",
+     "date": "2026-05-24"
+    },
+    {
+     "id": "r6",
+     "name": "GP de Mônaco",
+     "circuit": "Monte Carlo",
+     "date": "2026-06-07"
+    },
+    {
+     "id": "r7",
+     "name": "GP de Barcelona",
+     "circuit": "Barcelona-Catalunya",
+     "date": "2026-06-14"
+    },
+    {
+     "id": "r8",
+     "name": "GP da Áustria",
+     "circuit": "Red Bull Ring",
+     "date": "2026-06-28"
+    },
+    {
+     "id": "r9",
+     "name": "GP da Grã-Bretanha",
+     "circuit": "Silverstone",
+     "date": "2026-07-05"
+    },
+    {
+     "id": "r10",
+     "name": "GP da Bélgica",
+     "circuit": "Spa-Francorchamps",
+     "date": "2026-07-19"
+    },
+    {
+     "id": "r11",
+     "name": "GP da Hungria",
+     "circuit": "Hungaroring",
+     "date": "2026-07-26"
+    },
+    {
+     "id": "r12",
+     "name": "GP da Holanda",
+     "circuit": "Zandvoort",
+     "date": "2026-08-23"
+    },
+    {
+     "id": "r13",
+     "name": "GP da Itália",
+     "circuit": "Monza",
+     "date": "2026-09-06"
+    },
+    {
+     "id": "r14",
+     "name": "GP da Espanha (Madri)",
+     "circuit": "Madring",
+     "date": "2026-09-13"
+    },
+    {
+     "id": "r15",
+     "name": "GP do Azerbaijão",
+     "circuit": "Baku",
+     "date": "2026-09-26"
+    },
+    {
+     "id": "r16",
+     "name": "GP do Bahrein (em Sepang)",
+     "circuit": "Sepang, Malásia",
+     "date": "2026-10-04"
+    },
+    {
+     "id": "r17",
+     "name": "GP de Singapura",
+     "circuit": "Marina Bay",
+     "date": "2026-10-11"
+    },
+    {
+     "id": "r18",
+     "name": "GP dos EUA",
+     "circuit": "Austin",
+     "date": "2026-10-25"
+    },
+    {
+     "id": "r19",
+     "name": "GP do México",
+     "circuit": "Hermanos Rodríguez",
+     "date": "2026-11-01"
+    },
+    {
+     "id": "r20",
+     "name": "GP do Brasil",
+     "circuit": "Interlagos",
+     "date": "2026-11-08"
+    },
+    {
+     "id": "r21",
+     "name": "GP de Las Vegas",
+     "circuit": "Las Vegas",
+     "date": "2026-11-21"
+    },
+    {
+     "id": "r22",
+     "name": "GP do Catar",
+     "circuit": "Lusail",
+     "date": "2026-11-29"
+    },
+    {
+     "id": "r23",
+     "name": "GP de Abu Dhabi",
+     "circuit": "Yas Marina",
+     "date": "2026-12-06"
+    }
+   ],
+   "ratings": {
+    "r3": {
+     "drivers": {
+      "d1": [
+       0,
+       8.5,
+       7,
+       -2
+      ],
+      "d2": [
+       1,
+       8.5,
+       7,
+       -1
+      ],
+      "d3": [
+       2,
+       8.5,
+       7,
+       0
+      ],
+      "d4": [
+       3,
+       8.5,
+       7,
+       1
+      ],
+      "d5": [
+       4,
+       8.5,
+       7,
+       2
+      ],
+      "d6": [
+       5,
+       8.5,
+       7,
+       -2
+      ],
+      "d7": [
+       6,
+       8.5,
+       7,
+       -1
+      ],
+      "d8": [
+       7,
+       8.5,
+       7,
+       0
+      ],
+      "d9": [
+       8,
+       8.5,
+       7,
+       1
+      ],
+      "d10": [
+       9,
+       8.5,
+       7,
+       2
+      ],
+      "d11": [
+       0,
+       8.5,
+       7,
+       -2
+      ],
+      "d12": [
+       1,
+       8.5,
+       7,
+       -1
+      ]
+     },
+     "teams": {
+      "mclaren": [
+       5,
+       6.5,
+       7.75,
+       null
+      ],
+      "mercedes": [
+       6,
+       6.5,
+       7.75,
+       null
+      ],
+      "ferrari": [
+       7,
+       6.5,
+       7.75,
+       null
+      ],
+      "redbull": [
+       8,
+       6.5,
+       7.75,
+       null
+      ],
+      "williams": [
+       5,
+       6.5,
+       7.75,
+       null
+      ],
+      "aston": [
+       6,
+       6.5,
+       7.75,
+       null
+      ]
+     },
+     "race": [
+      8,
+      7.5,
+      9,
+      6.25
+     ],
+     "order": [
+      "d6",
+      "d8",
+      "d3",
+      "d5",
+      "d7",
+      "d4",
+      "d11",
+      "d1",
+      "d15",
+      "d19",
+      "d17",
+      "d2",
+      "d18",
+      "d16",
+      "d14",
+      "d12",
+      "d21",
+      "d9",
+      "d22",
+      "d13",
+      "d10",
+      "d20",
+      "d24"
+     ],
+     "fetched": [
+      "d6",
+      "d8",
+      "d3",
+      "d5",
+      "d7",
+      "d4",
+      "d11",
+      "d1",
+      "d15",
+      "d19",
+      "d17",
+      "d2",
+      "d18",
+      "d16",
+      "d14",
+      "d12",
+      "d21",
+      "d9",
+      "d22",
+      "d13",
+      "d10",
+      "d20",
+      "d24"
+     ],
+     "apiStatus": {
+      "d4": "DNF",
+      "d19": "DNS",
+      "d24": "DNF"
+     },
+     "apiTeam": {
+      "d6": "ferrari",
+      "d8": "mclaren",
+      "d3": "mclaren",
+      "d5": "mclaren",
+      "d7": "mclaren",
+      "d4": "mclaren",
+      "d11": "mclaren",
+      "d1": "ferrari",
+      "d15": "mclaren",
+      "d19": "mclaren",
+      "d17": "mclaren",
+      "d2": "mclaren",
+      "d18": "mclaren",
+      "d16": "mclaren",
+      "d14": "ferrari",
+      "d12": "mclaren",
+      "d21": "mclaren",
+      "d9": "mclaren",
+      "d22": "mclaren",
+      "d13": "mclaren",
+      "d10": "mclaren",
+      "d20": "ferrari",
+      "d24": "alpine"
+     },
+     "src": "OpenF1",
+     "manual": false,
+     "status": {
+      "d4": "DNS",
+      "d5": ""
+     },
+     "teamOv": {
+      "d15": "redbull"
+     },
+     "teamsManual": true,
+     "teamOrder": [
+      "cadillac",
+      "audi",
+      "haas",
+      "rb",
+      "aston",
+      "williams",
+      "mercedes",
+      "alpine",
+      "redbull",
+      "mclaren",
+      "ferrari"
+     ]
+    },
+    "r1": {
+     "drivers": {
+      "d1": [
+       9,
+       8,
+       7,
+       10
+      ]
+     },
+     "teams": {},
+     "race": [
+      5,
+      5,
+      5,
+      null
+     ],
+     "order": [
+      "d5",
+      "d6",
+      "d3",
+      "d4",
+      "d7",
+      "d1",
+      "d20",
+      "d16",
+      "d18",
+      "d11",
+      "d19",
+      "d13",
+      "d15",
+      "d12",
+      "d14",
+      "d21",
+      "d10",
+      "d9",
+      "d22",
+      "d2",
+      "d8",
+      "d17"
+     ]
+    }
+   }
+  },
+  "2027": {
+   "races": [
+    {
+     "id": "g1",
+     "name": "GP do Bahrein",
+     "circuit": "Sakhir",
+     "date": "2027-03-14",
+     "track": "sakhir"
+    },
+    {
+     "id": "g2",
+     "name": "GP da Arábia Saudita",
+     "circuit": "Jeddah",
+     "date": "2027-03-21",
+     "track": "jeddah"
+    },
+    {
+     "id": "g3",
+     "name": "GP da Austrália",
+     "circuit": "Albert Park",
+     "date": "2027-04-04",
+     "track": "r1"
+    },
+    {
+     "id": "g4",
+     "name": "GP do Japão",
+     "circuit": "Suzuka",
+     "date": "2027-04-11",
+     "track": "r3"
+    },
+    {
+     "id": "g5",
+     "name": "GP da China",
+     "circuit": "Xangai",
+     "date": "2027-04-18",
+     "track": "r2"
+    },
+    {
+     "id": "g6",
+     "name": "GP de Miami",
+     "circuit": "Miami",
+     "date": "2027-05-02",
+     "track": "r4"
+    },
+    {
+     "id": "g7",
+     "name": "GP do Canadá",
+     "circuit": "Montreal",
+     "date": "2027-05-23",
+     "track": "r5"
+    },
+    {
+     "id": "g8",
+     "name": "GP de Mônaco",
+     "circuit": "Monte Carlo",
+     "date": "2027-06-06",
+     "track": "r6"
+    },
+    {
+     "id": "g9",
+     "name": "GP de Portugal",
+     "circuit": "Portimão",
+     "date": "2027-06-20",
+     "track": "portimao"
+    },
+    {
+     "id": "g10",
+     "name": "GP da Grã-Bretanha",
+     "circuit": "Silverstone",
+     "date": "2027-07-04",
+     "track": "r9"
+    },
+    {
+     "id": "g11",
+     "name": "GP da Áustria",
+     "circuit": "Red Bull Ring",
+     "date": "2027-07-11",
+     "track": "r8"
+    },
+    {
+     "id": "g12",
+     "name": "GP da Bélgica",
+     "circuit": "Spa-Francorchamps",
+     "date": "2027-07-25",
+     "track": "r10"
+    },
+    {
+     "id": "g13",
+     "name": "GP da Hungria",
+     "circuit": "Hungaroring",
+     "date": "2027-08-01",
+     "track": "r11"
+    },
+    {
+     "id": "g14",
+     "name": "GP da Itália",
+     "circuit": "Monza",
+     "date": "2027-09-05",
+     "track": "r13"
+    },
+    {
+     "id": "g15",
+     "name": "GP da Espanha (Madri)",
+     "circuit": "Madring",
+     "date": "2027-09-12",
+     "track": "r14"
+    },
+    {
+     "id": "g16",
+     "name": "GP do Azerbaijão",
+     "circuit": "Baku",
+     "date": "2027-09-26",
+     "track": "r15"
+    },
+    {
+     "id": "g17",
+     "name": "GP da Turquia",
+     "circuit": "Istambul",
+     "date": "2027-10-03",
+     "track": "istanbul"
+    },
+    {
+     "id": "g18",
+     "name": "GP de Singapura",
+     "circuit": "Marina Bay",
+     "date": "2027-10-10",
+     "track": "r17"
+    },
+    {
+     "id": "g19",
+     "name": "GP dos EUA",
+     "circuit": "Austin",
+     "date": "2027-10-24",
+     "track": "r18"
+    },
+    {
+     "id": "g20",
+     "name": "GP do México",
+     "circuit": "Hermanos Rodríguez",
+     "date": "2027-10-31",
+     "track": "r19"
+    },
+    {
+     "id": "g21",
+     "name": "GP do Brasil",
+     "circuit": "Interlagos",
+     "date": "2027-11-07",
+     "track": "r20"
+    },
+    {
+     "id": "g22",
+     "name": "GP de Las Vegas",
+     "circuit": "Las Vegas",
+     "date": "2027-11-20",
+     "track": "r21"
+    },
+    {
+     "id": "g23",
+     "name": "GP do Catar",
+     "circuit": "Lusail",
+     "date": "2027-12-05",
+     "track": "r22"
+    },
+    {
+     "id": "g24",
+     "name": "GP de Abu Dhabi",
+     "circuit": "Yas Marina",
+     "date": "2027-12-12",
+     "track": "r23"
+    }
+   ],
+   "ratings": {}
+  }
+ },
+ "teamStand": {
+  "year": 2026,
+  "updated": "2026-11-03",
+  "pos": {
+   "mclaren": 1,
+   "mercedes": 2,
+   "ferrari": 3,
+   "redbull": 4,
+   "williams": 5,
+   "aston": 6,
+   "rb": 7,
+   "alpine": 8,
+   "haas": 9,
+   "audi": 10,
+   "cadillac": 11
+  },
+  "pts": {
+   "mclaren": 100,
+   "mercedes": 93,
+   "ferrari": 86,
+   "redbull": 79,
+   "williams": 72,
+   "aston": 65,
+   "rb": 58,
+   "alpine": 51,
+   "haas": 44,
+   "audi": 37,
+   "cadillac": 30
+  }
+ }
+}

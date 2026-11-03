@@ -83,6 +83,15 @@ O app não fala com nenhum serviço de nuvem por conta própria (continua 100% o
 
 O botão **⟳ Buscar resultado** (aba Notas) e a busca automática usam duas fontes públicas, nesta ordem: **OpenF1** (api.openf1.org, mais rápida) e, se ela falhar ou ainda não tiver a corrida, **Jolpica/Ergast** (api.jolpi.ca). A classificação de construtores vem da Jolpica. Sem internet, o app continua funcionando normalmente com a ordem que já estiver salva ou digitada.
 
+## Segurança da restauração de backups
+
+Ao restaurar um backup (Arquivo → Restaurar backup, ou o botão da barra lateral), o app **valida tudo antes de mexer nos seus dados**:
+estrutura e tipos, limites de tamanho, IDs únicos e válidos, referências entre pilotos, equipes e corridas, notas (número de -10 a 10 ou vazio), cores `#RRGGBB`, datas reais e imagens (somente PNG, JPEG ou WebP embutidas, com o conteúdo conferido; links externos e SVG são recusados).
+Backups de versões anteriores continuam sendo aceitos e convertidos. Se algo estiver errado, o app mostra "Backup inválido", lista os problemas e **não altera nenhum dado**.
+Os textos continuam sendo escapados na tela, e cores, imagens e IDs são checados de novo na hora de desenhar a página.
+
+Os testes (`npm test`) cobrem backups válidos, antigos (em `test/fixtures`), malformados e com tentativas de injeção.
+
 ## 4. Trazer os dados que você já tem (do arquivo HTML)
 
 1. No `eis-as-notas.html` que você usa hoje, clique em **Salvar backup**.

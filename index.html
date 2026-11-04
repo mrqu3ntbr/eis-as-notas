@@ -146,6 +146,7 @@ tr:hover .st-none{opacity:.7}
 .tsel{background:transparent;border:0;padding:0;margin:0;font-size:12px;color:var(--muted);cursor:pointer;max-width:150px;outline:none}
 .tsel option{background:var(--panel);color:var(--text)}
 .pcard.out{opacity:.5;filter:grayscale(.7)}
+.pcard[draggable=true]{cursor:grab}.pcard.dragging{opacity:.4}.pcard.over{outline:3px solid var(--red,#e10600);outline-offset:2px}
 .pcard.out:hover{opacity:.85}
 .tag{display:inline-block;background:#e1060022;color:var(--red2);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
 @media(max-width:800px){body{flex-direction:column}aside{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;padding:8px}.logo{border:0;padding:6px}
@@ -970,7 +971,7 @@ function vVisao(){
 function vPilotos(){
   const card=(d,out)=>{
     const t=teamOf(d.team),c=cardOf(d);
-    return `<div class="pcard ${out?"out":""}" data-id="${esc(d.id)}" title="${esc(d.name)}">
+    return `<div class="pcard ${out?"out":""}" draggable="true" data-id="${esc(d.id)}" title="${esc(d.name)}">
         ${c?`<img src="${c}" alt="${esc(d.name)}">`
            :`<div class="pfall" style="--c:${safeColor(t&&t.color)}"><b>${esc(d.name)}</b><span>${esc(t?t.name:"")}</span></div>`}
       </div>`;
@@ -985,6 +986,18 @@ function vPilotos(){
     <p class="sub" style="margin-top:-6px">Não participam desta temporada, mas as notas deles continuam no Histórico. Clique para reativar ou editar.</p>
     <div class="grid gp">${out.map(d=>card(d,true)).join("")}</div>`:""}`;
   $$("[data-id]").forEach(e=>e.onclick=()=>editDriver(e.dataset.id));
+  let dragId=null;                                   // arrastar e soltar: reordena os pilotos
+  $$(".pcard[data-id]").forEach(el=>{
+    el.ondragstart=e=>{ dragId=el.dataset.id; e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain",dragId); }catch(x){} el.classList.add("dragging"); };
+    el.ondragend=()=>{ dragId=null; $$(".pcard").forEach(x=>x.classList.remove("dragging","over")); };
+    el.ondragover=e=>{ if(dragId&&dragId!==el.dataset.id){ e.preventDefault(); el.classList.add("over"); } };
+    el.ondragleave=()=>el.classList.remove("over");
+    el.ondrop=e=>{ e.preventDefault(); const to=el.dataset.id; if(!dragId||dragId===to) return;
+      const a=S.drivers.findIndex(x=>x.id===dragId), t0=S.drivers.findIndex(x=>x.id===to); if(a<0||t0<0) return;
+      const [m]=S.drivers.splice(a,1); const t=S.drivers.findIndex(x=>x.id===to);
+      S.drivers.splice(a<t0?t+1:t,0,m);                // arrastando para frente entra depois do alvo; para trás, antes
+      save(); const y=window.scrollY; render(); window.scrollTo(0,y); };
+  });
   $("#addD").onclick=()=>editDriver(null);
 }
 

@@ -99,6 +99,8 @@ Em **Pilotos → editar → Excluir**, o app pergunta o que fazer:
 - **Tirar do elenco, mantendo o histórico** (padrão): escolha a última temporada dele (ex.: "2026 — sai a partir de 2027") ou "Nenhuma — só histórico". O piloto some das grades das corridas e da lista de pilotos das temporadas seguintes e passa a aparecer em "Fora do elenco", mas todas as notas dele continuam no Histórico, nos rankings e nos gráficos. Para trazê-lo de volta, edite o piloto e ajuste "Desde" / "Até".
 - **Excluir tudo…**: apaga o piloto e todas as notas dele (precisa digitar "Excluir dados").
 
+Na página de Pilotos você também pode **arrastar e soltar os cards** para mudar a ordem (a ordem é salva e vai no backup).
+
 Pilotos novos recebem automaticamente a temporada atual como "Desde", então um novato de 2027 não aparece nas corridas de 2026. Esses campos (`from`/`until`) entram no backup e são validados na restauração.
 
 ## 4. Trazer os dados que você já tem (do arquivo HTML)

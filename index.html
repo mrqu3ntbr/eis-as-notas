@@ -145,6 +145,8 @@ svg text{fill:var(--muted);font-size:11px}
 tr:hover .st-none{opacity:.7}
 .tsel{background:transparent;border:0;padding:0;margin:0;font-size:12px;color:var(--muted);cursor:pointer;max-width:150px;outline:none}
 .tsel option{background:var(--panel);color:var(--text)}
+.pcard.out{opacity:.5;filter:grayscale(.7)}
+.pcard.out:hover{opacity:.85}
 .tag{display:inline-block;background:#e1060022;color:var(--red2);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
 @media(max-width:800px){body{flex-direction:column}aside{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap;padding:8px}.logo{border:0;padding:6px}
   .brand{width:48px;margin:6px 4px 6px 8px}nav{display:flex;flex-wrap:wrap}.side-foot{display:none}main{padding:18px 14px}}
@@ -526,6 +528,8 @@ const BK = (function(){
       o.photo=img(d.photo,p+".photo");
       if(d.card!==undefined) o.card=img(d.card,p+".card");
       if(d.sub!==undefined){ const b=bool(d.sub,p+".sub"); if(b!==undefined) o.sub=b; }
+      if(d.from!==undefined){ if(!Number.isInteger(d.from)||d.from<2000||d.from>2100) err(p+".from","temporada inicial inválida"); else o.from=d.from; }
+      if(d.until!==undefined){ if(!Number.isInteger(d.until)||d.until<0||d.until>2100) err(p+".until","temporada final inválida"); else o.until=d.until; }
       return o;
     }).filter(Boolean);
 
@@ -639,6 +643,19 @@ function avg3(a){ // média das notas preenchidas; vale quando há pelo menos 3 
   const f=(a||[]).filter(x=>x!=null); return f.length>=3 ? f.reduce((x,y)=>x+y,0)/f.length : null; }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("on"),2200); }
 const teamOf = id => S.teams.find(t=>t.id===id);
+/* Elenco por temporada: from = primeira temporada, until = última (0 = nenhuma). Quem saiu continua nos dados, com todas as notas. */
+const driverActive=(d,y)=>{ y=y||S.season; return (d.from==null||y>=d.from)&&(d.until==null||y<=d.until); };
+const hasAnyNote=id=>Object.values(S.ratings).some(r=>r&&r.drivers&&r.drivers[id]&&r.drivers[id].some(v=>v!=null));
+const shownDrivers=()=>S.drivers.filter(d=>driverActive(d)||hasAnyNote(d.id));
+function purgeDriver(id){   // exclusão total: remove o piloto e as notas dele em TODAS as temporadas
+  const all=[S.ratings].concat(Object.values(S.seasons).map(x=>x.ratings));
+  all.forEach(rs=>Object.values(rs||{}).forEach(r=>{
+    if(r.drivers) delete r.drivers[id];
+    ["order","fetched"].forEach(k=>{ if(Array.isArray(r[k])) r[k]=r[k].filter(x=>x!==id); });
+    ["apiStatus","status","apiTeam","teamOv"].forEach(k=>{ if(r[k]) delete r[k][id]; });
+  }));
+  S.drivers=S.drivers.filter(x=>x.id!==id);
+}
 const driverOf = id => S.drivers.find(d=>d.id===id);
 const raceOf = id => S.races.find(r=>r.id===id);
 const initials = n => n.split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();
@@ -780,7 +797,7 @@ async function fetchTeamStandings(silent){
 /* ---------- Quem correu em cada GP (22 pilotos) e status DNF/DNS/DSQ ---------- */
 function partsOf(raceId,r){
   const off=r.fetched||RESULTS[raceId];
-  const base=off? off.slice() : S.drivers.filter(d=>!d.sub).map(d=>d.id);   // sem resultado: o grid titular (22)
+  const base=off? off.slice() : S.drivers.filter(d=>!d.sub&&driverActive(d)).map(d=>d.id);   // sem resultado: o grid titular (22)
   S.drivers.forEach(d=>{ const a=r.drivers[d.id]; if(a&&a.some(x=>x!=null)&&!base.includes(d.id)) base.push(d.id); }); // nunca esconde quem já tem nota
   return base;
 }
@@ -915,7 +932,7 @@ function vVisao(){
   const next=S.races.find(r=>!hasRating(r.id));
   M().innerHTML=`
     <h1>Visão geral</h1>
-    <p class="sub">Temporada ${S.season} · ${S.drivers.length} pilotos · ${S.teams.length} equipes · ${S.races.length} Grandes Prêmios</p>
+    <p class="sub">Temporada ${S.season} · ${S.drivers.filter(d=>driverActive(d)).length} pilotos · ${S.teams.length} equipes · ${S.races.length} Grandes Prêmios</p>
     <div class="grid g4">
       <div class="card stat"><div class="k">Corridas avaliadas</div><div class="v">${done}<span class="muted" style="font-size:16px"> / ${S.races.length}</span></div><div class="d">${next?`Próxima: ${esc(next.name)}`:"Temporada completa"}</div></div>
       <div class="card stat"><div class="k">Melhor piloto</div><div class="v">${rd?esc(rd.x.name):"—"}</div><div class="d">${rd?`Média ${tv(rd.avg)} em ${rd.n} corrida(s)`:"Sem notas ainda"}</div></div>
@@ -951,17 +968,22 @@ function vVisao(){
 
 /* ============ 2. Pilotos ============ */
 function vPilotos(){
-  const list=S.drivers.map(d=>({x:d}));
-  M().innerHTML=`
-    <h1>Pilotos</h1>
-    <p class="sub">As médias e o ranking dos pilotos ficam no Histórico. Clique em um card para editar nome, equipe ou imagens.</p>
-    <div class="toolbar"><button class="btn red" id="addD">+ Piloto</button></div>
-    <div class="grid gp">${list.map((r,i)=>{
-      const d=r.x,t=teamOf(d.team),c=cardOf(d);
-      return `<div class="pcard" data-id="${esc(d.id)}" title="${esc(d.name)}">
+  const card=(d,out)=>{
+    const t=teamOf(d.team),c=cardOf(d);
+    return `<div class="pcard ${out?"out":""}" data-id="${esc(d.id)}" title="${esc(d.name)}">
         ${c?`<img src="${c}" alt="${esc(d.name)}">`
            :`<div class="pfall" style="--c:${safeColor(t&&t.color)}"><b>${esc(d.name)}</b><span>${esc(t?t.name:"")}</span></div>`}
-      </div>`;}).join("")}</div>`;
+      </div>`;
+  };
+  const act=S.drivers.filter(d=>driverActive(d)), out=S.drivers.filter(d=>!driverActive(d));
+  M().innerHTML=`
+    <h1>Pilotos</h1>
+    <p class="sub">As médias e o ranking dos pilotos ficam no Histórico. Clique em um card para editar nome, equipe, imagens ou as temporadas em que ele participa.</p>
+    <div class="toolbar"><button class="btn red" id="addD">+ Piloto</button></div>
+    <div class="grid gp">${act.map(d=>card(d,false)).join("")}</div>
+    ${out.length?`<h2>Fora do elenco em ${S.season}</h2>
+    <p class="sub" style="margin-top:-6px">Não participam desta temporada, mas as notas deles continuam no Histórico. Clique para reativar ou editar.</p>
+    <div class="grid gp">${out.map(d=>card(d,true)).join("")}</div>`:""}`;
   $$("[data-id]").forEach(e=>e.onclick=()=>editDriver(e.dataset.id));
   $("#addD").onclick=()=>editDriver(null);
 }
@@ -1122,7 +1144,7 @@ function vCorridas(){
 function vHistorico(){
   const done=S.races.filter(r=>hasRating(r.id));
   if(!histRace||!raceOf(histRace)) histRace=(done[done.length-1]||S.races[0]||{}).id;
-  if(!histEnt.id||!(histEnt.kind==="piloto"?driverOf(histEnt.id):teamOf(histEnt.id))) histEnt={kind:"piloto",id:S.drivers[0]?.id};
+  if(!histEnt.id||!(histEnt.kind==="piloto"?driverOf(histEnt.id):teamOf(histEnt.id))) histEnt={kind:"piloto",id:shownDrivers()[0]?.id};
   const r=histRace?rr(histRace):null;
   const dRank=ranked(S.drivers,driverAccum), tRank=ranked(S.teams,teamAccum);
   M().innerHTML=`
@@ -1139,18 +1161,18 @@ function vHistorico(){
     <h2>Evolução</h2>
     <div class="toolbar">
       <select id="eKind"><option value="piloto" ${histEnt.kind==="piloto"?"selected":""}>Piloto</option><option value="equipe" ${histEnt.kind==="equipe"?"selected":""}>Equipe</option></select>
-      <select id="eId">${(histEnt.kind==="piloto"?S.drivers:S.teams).map(x=>`<option value="${esc(x.id)}" ${x.id===histEnt.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+      <select id="eId">${(histEnt.kind==="piloto"?shownDrivers():S.teams).map(x=>`<option value="${esc(x.id)}" ${x.id===histEnt.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
     </div>
     <div class="card" id="chart"></div>
 
     <h2>Ranking acumulado — pilotos</h2>
-    ${barChart(`<span>Média de todas as corridas avaliadas na temporada</span>`,dRank.filter(({x,avg})=>avg!=null||!x.sub).map(({x,avg,n},i)=>({n:i+1,label:esc(x.name),v:avg,color:(teamOf(x.team)||{}).color,title:x.name+": "+n+" corrida(s) avaliada(s)"})))}
+    ${barChart(`<span>Média de todas as corridas avaliadas na temporada</span>`,dRank.filter(({x,avg})=>avg!=null||(!x.sub&&driverActive(x))).map(({x,avg,n},i)=>({n:i+1,label:esc(x.name),v:avg,color:(teamOf(x.team)||{}).color,title:x.name+": "+n+" corrida(s) avaliada(s)"})))}
     <h2>Ranking acumulado — equipes</h2>
     ${barChart(`<span>Média de todas as corridas avaliadas na temporada</span>`,tRank.map(({x,avg,n},i)=>({n:i+1,label:esc(x.name),v:avg,color:x.color,title:x.name+": "+n+" corrida(s) avaliada(s)"})))}
     <h2>Ranking de corridas</h2>
     ${racesChart()}`;
   $("#hRace").onchange=e=>{ histRace=e.target.value; render(); };
-  $("#eKind").onchange=e=>{ histEnt={kind:e.target.value,id:(e.target.value==="piloto"?S.drivers:S.teams)[0]?.id}; render(); };
+  $("#eKind").onchange=e=>{ histEnt={kind:e.target.value,id:(e.target.value==="piloto"?shownDrivers():S.teams)[0]?.id}; render(); };
   $("#eId").onchange=e=>{ histEnt.id=e.target.value; render(); };
   drawChart();
 }
@@ -1210,8 +1232,10 @@ function confirmTyped(title,msg,phrase){
       <label>Para confirmar, digite: <b style="color:var(--text)">${esc(phrase)}</b></label>
       <input type="text" id="cfT" autocomplete="off" spellcheck="false" placeholder="${esc(phrase)}">
       <div class="row" style="margin-top:20px;justify-content:flex-end"><button class="btn" id="cfC">Cancelar</button><button class="btn red" id="cfOk" disabled>Excluir</button></div>`;
-    let done=false; const fin=v=>{ if(done) return; done=true; try{ dlg.close(); }catch(e){} dlg.style.width=""; res(v); };
-    dlg.addEventListener("close",()=>fin(false),{once:true});   // Esc ou fechar = cancelar
+    let done=false, armed=false;
+    const onClose=()=>{ if(armed) fin(false); };               // Esc ou fechar = cancelar (ignora o "close" de um diálogo anterior)
+    const fin=v=>{ if(done) return; done=true; dlg.removeEventListener("close",onClose); try{ dlg.close(); }catch(e){} dlg.style.width=""; res(v); };
+    dlg.addEventListener("close",onClose); setTimeout(()=>{ armed=true; },150);
     dlg.showModal();
     const inp=$("#cfT"), ok=$("#cfOk"); inp.focus();
     const chk=()=>{ ok.disabled = inp.value.trim().toLowerCase()!==phrase.toLowerCase(); };
@@ -1224,24 +1248,46 @@ function confirmTyped(title,msg,phrase){
 function imgField(id,label,cur){ return `<label>${label}</label><div class="row"><input type="file" id="${esc(id)}" accept="image/*">${cur?`<button class="btn sm" type="button" data-clear="${esc(id)}">Remover</button>`:""}</div>`; }
 function wireClear(pending){ $$("[data-clear]",dlg).forEach(b=>b.onclick=()=>{ pending[b.dataset.clear]=null; b.textContent="Removida ✔"; }); }
 
+function removeDriver(id){
+  const d=driverOf(id); if(!d) return;
+  const ys=Object.keys(S.seasons).sort();
+  dlg.innerHTML=`<h2 style="margin-top:0">Excluir piloto</h2>
+    <p style="margin:0 0 4px">O que fazer com <b>${esc(d.name)}</b>?</p>
+    <label>Retirar do elenco, mantendo todas as notas e o histórico. Última temporada em que ele participa:</label>
+    <select id="rmU">${ys.map(y=>`<option value="${esc(y)}" ${+y===S.season?"selected":""}>${esc(y)} — sai a partir de ${+y+1}</option>`).join("")}<option value="0">Nenhuma — só histórico</option></select>
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn red" id="rmKeep" type="button">Retirar do elenco</button></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0 12px">
+    <div class="muted" style="font-size:13px">Ou apagar de vez: remove o piloto e as notas dele em todas as temporadas.</div>
+    <div class="row" style="margin-top:10px;justify-content:space-between"><button class="btn" id="rmAll" type="button">Excluir tudo…</button><button class="btn" id="rmC" type="button">Cancelar</button></div>`;
+  dlg.showModal();
+  $("#rmC").onclick=closeDlg;
+  $("#rmKeep").onclick=()=>{ d.until=+$("#rmU").value; save(); closeDlg(); render(); toast(d.name+" saiu do elenco; o histórico foi mantido"); };
+  $("#rmAll").onclick=async()=>{
+    closeDlg();
+    if(await confirmTyped("Excluir piloto e notas","Isto apagará "+d.name+" e TODAS as notas dele, em todas as temporadas. A ação não pode ser desfeita (a menos que você tenha um backup).","Excluir dados")){ purgeDriver(id); save(); render(); toast("Piloto excluído"); }
+  };
+}
 function editDriver(id){
-  const d=id?driverOf(id):{name:"",team:S.teams[0]?.id,photo:null};
+  const d=id?driverOf(id):{name:"",team:S.teams[0]?.id,photo:null,from:S.season};
   const pend={};
   dlg.innerHTML=`<h2 style="margin-top:0">${id?"Editar piloto":"Novo piloto"}</h2>
     <label>Nome</label><input type="text" id="fN" value="${esc(d.name)}">
     <label>Equipe</label><select id="fT">${S.teams.map(t=>`<option value="${esc(t.id)}" ${t.id===d.team?"selected":""}>${esc(t.name)}</option>`).join("")}</select>
     ${imgField("fCd","Card do piloto (banner)",d.card)}
     ${imgField("fP","Miniatura do rosto",d.photo)}
+    <label>Participa a partir de</label><select id="fFrom"><option value="">Desde o início</option>${Object.keys(S.seasons).sort().map(y=>`<option value="${esc(y)}" ${d.from===+y?"selected":""}>${esc(y)}</option>`).join("")}</select>
+    <label>Participa até</label><select id="fUntil"><option value="">Continua (sem data de saída)</option>${Object.keys(S.seasons).sort().map(y=>`<option value="${esc(y)}" ${d.until===+y?"selected":""}>${esc(y)}</option>`).join("")}<option value="0" ${d.until===0?"selected":""}>Nenhuma (só histórico)</option></select>
     <div class="muted" style="font-size:12px;margin-top:6px">Sem envio, o aplicativo usa as imagens padrão. "Remover" volta para a imagem padrão.</div>
     <div class="row" style="margin-top:20px;justify-content:space-between"><div>${id?`<button class="btn" id="fDel">Excluir</button>`:""}</div>
     <div class="row"><button class="btn" id="fC">Cancelar</button><button class="btn red" id="fS">Salvar</button></div></div>`;
   dlg.showModal(); wireClear(pend);
   $("#fC").onclick=closeDlg;
-  if(id) $("#fDel").onclick=()=>{ if(confirm("Excluir este piloto e as notas dele em todas as corridas?")){ S.drivers=S.drivers.filter(x=>x.id!==id); Object.values(S.ratings).forEach(r=>{delete r.drivers[id]; r.order=r.order.filter(x=>x!==id);}); save(); closeDlg(); render(); } };
+  if(id) $("#fDel").onclick=()=>removeDriver(id);
   $("#fS").onclick=async()=>{
     const name=$("#fN").value.trim(); if(!name){ $("#fN").focus(); return; }
-    let o=d; if(!id){ o={id:"d"+Date.now(),photo:null}; S.drivers.push(o); }
+    let o=d; if(!id){ o={id:"d"+Date.now(),photo:null,from:S.season}; S.drivers.push(o); }
     o.name=name; o.team=$("#fT").value;
+    { const fv=$("#fFrom").value, uv=$("#fUntil").value; if(fv==="") delete o.from; else o.from=+fv; if(uv==="") delete o.until; else o.until=+uv; }
     if("fP" in pend) o.photo=null;
     if("fCd" in pend) o.card=null;
     let f=$("#fP").files[0]; if(f) o.photo=await fileToData(f,200);
@@ -1261,7 +1307,7 @@ function editTeam(id){
     <div class="row"><button class="btn" id="fC">Cancelar</button><button class="btn red" id="fS">Salvar</button></div></div>`;
   dlg.showModal(); wireClear(pend);
   $("#fC").onclick=closeDlg;
-  if(id) $("#fDel").onclick=()=>{ if(S.drivers.some(d=>d.team===id)){ alert("Mude ou exclua os pilotos desta equipe antes de excluí-la."); return; } if(confirm("Excluir esta equipe e as notas dela?")){ S.teams=S.teams.filter(x=>x.id!==id); Object.values(S.ratings).forEach(r=>delete r.teams[id]); save(); closeDlg(); render(); } };
+  if(id) $("#fDel").onclick=()=>{ if(S.drivers.some(d=>d.team===id)){ alert("Mude a equipe dos pilotos desta equipe (inclusive dos que já saíram do elenco) antes de excluí-la."); return; } if(confirm("Excluir esta equipe e as notas dela?")){ S.teams=S.teams.filter(x=>x.id!==id); Object.values(S.ratings).forEach(r=>delete r.teams[id]); save(); closeDlg(); render(); } };
   $("#fS").onclick=async()=>{
     const name=$("#fN").value.trim(); if(!name){ $("#fN").focus(); return; }
     let o=t; if(!id){ o={id:"t"+Date.now(),logo:null,car:null}; S.teams.push(o); }

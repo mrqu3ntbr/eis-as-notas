@@ -245,4 +245,21 @@ ok("funções seguras de renderização", () => {
   assert.strictEqual(run("safeImg(__p)", {__p: PNG + '"onerror="x'}), null);
 });
 
+// --- Elenco por temporada: drivers[].from / drivers[].until ---
+{
+  const withDrv = patch => { const o = fx("backup-v4-completo.json"); Object.assign(o.drivers[0], patch); return o; };
+  const good = (name, patch, chk) => ok("elenco: " + name, () => { const r = prep(JSON.stringify(withDrv(patch))); assert.ok(r.ok, JSON.stringify(r.errors)); if (chk) chk(r.next.drivers[0]); });
+  good("until 2026 é aceito", { until: 2026 }, d => assert.strictEqual(d.until, 2026));
+  good("until 0 (só histórico) é aceito", { until: 0 }, d => assert.strictEqual(d.until, 0));
+  good("from 2027 é aceito", { from: 2027 }, d => assert.strictEqual(d.from, 2027));
+  good("sem from/until continua valendo", {}, d => { assert.ok(d.from == null); assert.ok(d.until == null); });
+  refused("until com texto", withDrv({ until: "2026" }));
+  refused("until decimal", withDrv({ until: 2026.5 }));
+  refused("until negativo", withDrv({ until: -1 }));
+  refused("until gigante", withDrv({ until: 99999 }));
+  refused("from com texto", withDrv({ from: "2027" }));
+  refused("from fora do intervalo", withDrv({ from: 1500 }));
+  refused("from objeto", withDrv({ from: { a: 1 } }));
+}
+
 console.log(process.exitCode ? "import.test.js: HÁ FALHAS" : "import.test.js: todos os " + passed + " testes passaram");

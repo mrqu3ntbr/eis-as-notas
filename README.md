@@ -92,6 +92,15 @@ Os textos continuam sendo escapados na tela, e cores, imagens e IDs são checado
 
 Os testes (`npm test`) cobrem backups válidos, antigos (em `test/fixtures`), malformados e com tentativas de injeção.
 
+## Troca de pilotos entre temporadas
+
+Em **Pilotos → editar → Excluir**, o app pergunta o que fazer:
+
+- **Tirar do elenco, mantendo o histórico** (padrão): escolha a última temporada dele (ex.: "2026 — sai a partir de 2027") ou "Nenhuma — só histórico". O piloto some das grades das corridas e da lista de pilotos das temporadas seguintes e passa a aparecer em "Fora do elenco", mas todas as notas dele continuam no Histórico, nos rankings e nos gráficos. Para trazê-lo de volta, edite o piloto e ajuste "Desde" / "Até".
+- **Excluir tudo…**: apaga o piloto e todas as notas dele (precisa digitar "Excluir dados").
+
+Pilotos novos recebem automaticamente a temporada atual como "Desde", então um novato de 2027 não aparece nas corridas de 2026. Esses campos (`from`/`until`) entram no backup e são validados na restauração.
+
 ## 4. Trazer os dados que você já tem (do arquivo HTML)
 
 1. No `eis-as-notas.html` que você usa hoje, clique em **Salvar backup**.
